@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,.vercel.app').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,.railway.app').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -110,9 +110,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Celery
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/1')
+# Celery — Railway provides REDIS_URL; use it as fallback if specific vars not set
+_redis_url = config('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_BROKER_URL    = config('CELERY_BROKER_URL',    default=_redis_url)
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=_redis_url)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -132,13 +133,13 @@ CACHES = {
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'noreply@questdnc.com'
 
-# CSRF / Security — trust Vercel domains
+# CSRF / Security — trust Railway and custom domains
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
-    default='https://*.vercel.app',
+    default='https://*.railway.app',
 ).split(',')
 
-# When behind Vercel's reverse proxy
+# Railway (and most PaaS) terminate SSL at the edge
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Scrubber

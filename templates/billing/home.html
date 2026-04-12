@@ -5,64 +5,55 @@
 {% block extra_css %}
 <style>
   .tier-card {
-    background: #0d1117;
-    border: 1px solid #21262d;
-    border-radius: 14px;
-    padding: 2rem 1.75rem;
-    position: relative;
-    transition: border-color .2s, transform .2s;
-    height: 100%;
+    background:#0d1117; border:1px solid #21262d; border-radius:14px;
+    padding:2rem 1.75rem; position:relative; transition:border-color .2s,transform .2s; height:100%;
   }
-  .tier-card:hover { border-color: #30363d; transform: translateY(-3px); }
-  .tier-card.featured {
-    border-color: #3b82f6;
-    background: linear-gradient(180deg, rgba(59,130,246,.07) 0%, #0d1117 60%);
+  .tier-card:hover { border-color:#30363d; transform:translateY(-3px); }
+  .tier-card.featured { border-color:#3b82f6; background:linear-gradient(180deg,rgba(59,130,246,.07) 0%,#0d1117 60%); }
+  .tier-badge { position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:#3b82f6; color:#fff; font-size:.72rem; font-weight:700; padding:.25rem .85rem; border-radius:20px; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; }
+  .tier-name   { font-size:1rem; font-weight:700; color:#e6edf3; }
+  .tier-price  { font-size:2.6rem; font-weight:800; color:#e6edf3; line-height:1; }
+  .tier-price sup { font-size:1.2rem; font-weight:600; vertical-align:super; }
+  .tier-credits { font-size:.875rem; color:#6e7681; margin-top:.2rem; }
+  .tier-per-k   { font-size:.78rem; color:#3fb950; font-weight:600; }
+  .tier-features { list-style:none; padding:0; margin:1.5rem 0; }
+  .tier-features li { padding:.4rem 0; font-size:.875rem; color:#8b949e; display:flex; align-items:center; gap:.6rem; border-bottom:1px solid #161b22; }
+  .tier-features li:last-child { border-bottom:none; }
+  .tier-features li i { color:#3fb950; flex-shrink:0; }
+
+  /* Stripe card element */
+  #card-element {
+    background:#161b22; border:1px solid #30363d; border-radius:8px;
+    padding:.85rem 1rem; transition:border-color .15s;
   }
-  .tier-badge {
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #3b82f6;
-    color: #fff;
-    font-size: .72rem;
-    font-weight: 700;
-    padding: .25rem .85rem;
-    border-radius: 20px;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  .tier-name { font-size: 1rem; font-weight: 700; color: #e6edf3; }
-  .tier-price { font-size: 2.6rem; font-weight: 800; color: #e6edf3; line-height: 1; }
-  .tier-price sup { font-size: 1.2rem; font-weight: 600; vertical-align: super; }
-  .tier-credits { font-size: .875rem; color: #6e7681; margin-top: .2rem; }
-  .tier-per-k   { font-size: .78rem; color: #3fb950; font-weight: 600; }
-  .tier-features { list-style: none; padding: 0; margin: 1.5rem 0; }
-  .tier-features li {
-    padding: .4rem 0;
-    font-size: .875rem;
-    color: #8b949e;
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    border-bottom: 1px solid #161b22;
-  }
-  .tier-features li:last-child { border-bottom: none; }
-  .tier-features li i { color: #3fb950; flex-shrink: 0; }
+  #card-element.StripeElement--focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+  #card-element.StripeElement--invalid { border-color:#f85149; }
+
+  /* Payment state UI */
+  .pay-state { display:none; }
+  .pay-state.active { display:block; }
+  #payment-processing { text-align:center; padding:1.5rem 0; }
+  #payment-success    { text-align:center; padding:1rem 0; }
+  #payment-error-msg  { font-size:.82rem; color:#f85149; margin-top:.5rem; min-height:1.2em; }
+
+  #pay-btn { position:relative; }
+  #pay-btn .spinner { display:none; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; }
+  #pay-btn.loading .btn-label { display:none; }
+  #pay-btn.loading .spinner { display:inline-block; }
+  @keyframes spin { to { transform:rotate(360deg); } }
 </style>
 {% endblock %}
 
 {% block content %}
-
 <div class="mb-4">
   <h4 class="fw-bold mb-1" style="color:#e6edf3;">Buy Credits</h4>
   <p class="mb-0" style="color:#6e7681;font-size:.875rem;">
-    Credits never expire. Your current balance: <strong style="color:#3fb950;">{{ user.credits|floatformat:0 }} credits</strong>
+    Credits never expire. Balance:
+    <strong style="color:#3fb950;">{{ user.credits|floatformat:0 }} credits</strong>
   </p>
 </div>
 
-<!-- ── Pricing tiers ───────────────────────────────── -->
+<!-- ── Pricing tiers ──────────────────────────────────────── -->
 <div class="row g-4 mb-5">
   {% for tier in tiers %}
   <div class="col-md-4">
@@ -70,29 +61,24 @@
       {% if tier.highlighted %}
         <div class="tier-badge"><i class="bi bi-star-fill me-1"></i>Most Popular</div>
       {% endif %}
-
       <div class="mb-3">
         <div class="tier-name mb-1">{{ tier.name }}</div>
-        <div class="tier-price">
-          <sup>$</sup>{{ tier.price }}
-        </div>
+        <div class="tier-price"><sup>$</sup>{{ tier.price }}</div>
         <div class="tier-credits">{{ tier.credits_display }} credits</div>
         <div class="tier-per-k">{{ tier.per_k }} per 1,000 numbers</div>
       </div>
-
       <ul class="tier-features">
         {% for f in tier.features %}
         <li><i class="bi bi-check-circle-fill"></i>{{ f }}</li>
         {% endfor %}
       </ul>
-
       <button
-        class="btn w-100 fw-semibold {% if tier.highlighted %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-        data-bs-toggle="modal"
-        data-bs-target="#purchaseModal"
+        class="btn w-100 fw-semibold {% if tier.highlighted %}btn-primary{% else %}btn-outline-secondary{% endif %} purchase-btn"
         data-tier="{{ tier.name }}"
         data-price="{{ tier.price }}"
         data-credits="{{ tier.credits_display }}"
+        data-bs-toggle="modal"
+        data-bs-target="#purchaseModal"
       >
         Purchase — ${{ tier.price }}
       </button>
@@ -101,7 +87,7 @@
   {% endfor %}
 </div>
 
-<!-- ── Payment history ─────────────────────────────── -->
+<!-- ── Recent payments ────────────────────────────────────── -->
 <div class="card">
   <div class="card-header py-3">
     <h6 class="mb-0 fw-semibold">Recent Purchases</h6>
@@ -139,7 +125,7 @@
         {% empty %}
         <tr>
           <td colspan="5" class="text-center py-4" style="color:#6e7681;">
-            <i class="bi bi-receipt fs-3 d-block mb-2"></i>No purchases yet.
+            <i class="bi bi-receipt fs-2 d-block mb-2"></i>No purchases yet.
           </td>
         </tr>
         {% endfor %}
@@ -148,57 +134,77 @@
   </div>
 </div>
 
-<!-- ── Purchase modal ──────────────────────────────── -->
-<div class="modal fade" id="purchaseModal" tabindex="-1">
+<!-- ── Purchase modal ─────────────────────────────────────── -->
+<div class="modal fade" id="purchaseModal" tabindex="-1" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
+
       <div class="modal-header" style="border-bottom:1px solid #21262d;">
         <h5 class="modal-title fw-semibold" style="color:#e6edf3;">
           <i class="bi bi-coin me-2 text-primary"></i>Purchase Credits
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="modal-close-btn"></button>
       </div>
+
       <div class="modal-body p-4">
+
+        <!-- Order summary -->
         <div class="p-3 rounded mb-4 text-center" style="background:#161b22;border:1px solid #21262d;">
-          <div id="modalTier" style="font-size:.8rem;color:#6e7681;text-transform:uppercase;letter-spacing:.06em;font-weight:600;"></div>
-          <div id="modalCredits" style="font-size:2rem;font-weight:800;color:#e6edf3;line-height:1.1;"></div>
-          <div style="color:#6e7681;font-size:.8rem;">credits</div>
-          <div id="modalPrice" style="font-size:1.3rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
+          <div id="modal-tier-name" style="font-size:.78rem;color:#6e7681;text-transform:uppercase;letter-spacing:.06em;font-weight:600;"></div>
+          <div id="modal-credits"   style="font-size:2rem;font-weight:800;color:#e6edf3;line-height:1.1;margin-top:.2rem;"></div>
+          <div style="color:#6e7681;font-size:.78rem;">credits</div>
+          <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
 
-        <form id="purchaseForm" method="post" action="#">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="purchase">
-          <input type="hidden" name="tier" id="modalTierInput">
+        <!-- ── State: payment form ─────────────────── -->
+        <div class="pay-state active" id="state-form">
+          <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">Card Details</label>
+          <div id="card-element"></div>
+          <div id="payment-error-msg"></div>
 
-          <div class="mb-3">
-            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Card Number</label>
-            <div class="form-control d-flex align-items-center gap-2" style="background:#161b22;border-color:#30363d;cursor:not-allowed;opacity:.6;">
-              <i class="bi bi-credit-card" style="color:#6e7681;"></i>
-              <span style="color:#6e7681;font-size:.875rem;">Stripe payment integration coming soon</span>
-            </div>
+          <div class="mt-3 mb-4 p-3 rounded d-flex align-items-center gap-2" style="background:#161b22;border:1px solid #21262d;font-size:.78rem;color:#6e7681;">
+            <i class="bi bi-lock-fill" style="color:#3b82f6;font-size:.9rem;flex-shrink:0;"></i>
+            Payments processed securely by Stripe. We never store your card number.
           </div>
 
-          <div class="row g-2 mb-4">
-            <div class="col-6">
-              <label class="form-label" style="color:#8b949e;font-size:.85rem;">Expiry</label>
-              <input type="text" class="form-control" placeholder="MM / YY" disabled style="opacity:.6;">
-            </div>
-            <div class="col-6">
-              <label class="form-label" style="color:#8b949e;font-size:.85rem;">CVC</label>
-              <input type="text" class="form-control" placeholder="•••" disabled style="opacity:.6;">
-            </div>
-          </div>
-
-          <div class="alert py-2 mb-3" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);font-size:.8rem;color:#8b949e;">
-            <i class="bi bi-lock-fill me-1" style="color:#3b82f6;"></i>
-            Payments are processed securely via Stripe. Your card details are never stored on our servers.
-          </div>
-
-          <button type="button" class="btn btn-primary w-100 fw-semibold" disabled>
-            <i class="bi bi-lock-fill me-1"></i>Complete Purchase (Stripe coming soon)
+          <button id="pay-btn" class="btn btn-primary w-100 fw-semibold py-2" type="button">
+            <span class="btn-label"><i class="bi bi-lock-fill me-1"></i>Pay <span id="pay-btn-amount"></span></span>
+            <span class="spinner mx-auto"></span>
           </button>
-        </form>
+        </div>
+
+        <!-- ── State: processing ───────────────────── -->
+        <div class="pay-state" id="state-processing">
+          <div id="payment-processing">
+            <div class="spinner-border text-primary mb-3" role="status" style="width:2.5rem;height:2.5rem;"></div>
+            <div style="color:#8b949e;font-size:.9rem;">Processing your payment…</div>
+          </div>
+        </div>
+
+        <!-- ── State: success ─────────────────────── -->
+        <div class="pay-state" id="state-success">
+          <div id="payment-success">
+            <div class="mb-3" style="font-size:3rem;">✅</div>
+            <h6 class="fw-bold mb-1" style="color:#e6edf3;">Payment Successful!</h6>
+            <p style="color:#6e7681;font-size:.875rem;" id="success-msg"></p>
+            <button class="btn btn-outline-success w-100 mt-2" onclick="location.reload()">
+              <i class="bi bi-arrow-clockwise me-1"></i>Refresh Balance
+            </button>
+          </div>
+        </div>
+
+        <!-- ── State: error ───────────────────────── -->
+        <div class="pay-state" id="state-error">
+          <div class="text-center py-3">
+            <div class="mb-3" style="font-size:2.5rem;">❌</div>
+            <h6 class="fw-bold mb-1" style="color:#f85149;">Payment Failed</h6>
+            <p id="error-detail" style="color:#8b949e;font-size:.85rem;"></p>
+            <button class="btn btn-outline-secondary w-100 mt-2" id="retry-btn">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Try Again
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -206,14 +212,171 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Stripe.js -->
+<script src="https://js.stripe.com/v3/"></script>
+
 <script>
-const purchaseModal = document.getElementById('purchaseModal');
-purchaseModal.addEventListener('show.bs.modal', e => {
-  const btn = e.relatedTarget;
-  document.getElementById('modalTier').textContent    = btn.dataset.tier + ' Plan';
-  document.getElementById('modalCredits').textContent = btn.dataset.credits;
-  document.getElementById('modalPrice').textContent   = '$' + btn.dataset.price;
-  document.getElementById('modalTierInput').value     = btn.dataset.tier;
-});
+(function () {
+  'use strict';
+
+  const PUBLISHABLE_KEY = '{{ stripe_pk }}';
+  const CREATE_PI_URL   = '{% url "billing:create_payment_intent" %}';
+  const CSRF_TOKEN      = '{{ csrf_token }}';
+
+  let stripe, cardElement, currentTier = null;
+
+  // ── Bootstrap modal events ────────────────────────────────────────────────
+  const modalEl = document.getElementById('purchaseModal');
+
+  modalEl.addEventListener('show.bs.modal', e => {
+    const btn = e.relatedTarget;
+    if (!btn) return;
+
+    currentTier = {
+      name:    btn.dataset.tier,
+      price:   btn.dataset.price,
+      credits: btn.dataset.credits,
+    };
+
+    // Populate order summary
+    document.getElementById('modal-tier-name').textContent = currentTier.name + ' Plan';
+    document.getElementById('modal-credits').textContent   = currentTier.credits;
+    document.getElementById('modal-price').textContent     = '$' + currentTier.price;
+    document.getElementById('pay-btn-amount').textContent  = '$' + currentTier.price;
+
+    // Reset to form state
+    showState('form');
+    document.getElementById('payment-error-msg').textContent = '';
+
+    // Mount Stripe card element
+    if (!stripe) {
+      if (!PUBLISHABLE_KEY || PUBLISHABLE_KEY.startsWith('pk_test_...')) {
+        document.getElementById('card-element').innerHTML =
+          '<div style="color:#d29922;font-size:.82rem;padding:.5rem 0;">' +
+          '<i class="bi bi-exclamation-triangle me-1"></i>' +
+          'Add your Stripe publishable key to .env to enable payments.</div>';
+        document.getElementById('pay-btn').disabled = true;
+        return;
+      }
+      stripe = Stripe(PUBLISHABLE_KEY);
+    }
+
+    // Destroy previous element if exists
+    if (cardElement) { cardElement.destroy(); }
+
+    const elements = stripe.elements({
+      appearance: {
+        theme: 'night',
+        variables: {
+          colorPrimary:    '#3b82f6',
+          colorBackground: '#161b22',
+          colorText:       '#e6edf3',
+          colorDanger:     '#f85149',
+          fontFamily:      '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+          borderRadius:    '8px',
+        },
+      },
+    });
+
+    cardElement = elements.create('card', {
+      style: {
+        base: {
+          color:           '#e6edf3',
+          fontSize:        '15px',
+          fontFamily:      '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+          '::placeholder': { color: '#6e7681' },
+        },
+        invalid: { color: '#f85149' },
+      },
+      hidePostalCode: false,
+    });
+
+    cardElement.mount('#card-element');
+
+    cardElement.on('change', e => {
+      document.getElementById('payment-error-msg').textContent =
+        e.error ? e.error.message : '';
+    });
+  });
+
+  // Clean up on close
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    if (cardElement) { cardElement.destroy(); cardElement = null; }
+  });
+
+  // ── Pay button ────────────────────────────────────────────────────────────
+  document.getElementById('pay-btn').addEventListener('click', async () => {
+    if (!stripe || !cardElement || !currentTier) return;
+
+    setPayBtnLoading(true);
+    document.getElementById('payment-error-msg').textContent = '';
+
+    try {
+      // 1. Create PaymentIntent on the server
+      const piRes = await fetch(CREATE_PI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken':  CSRF_TOKEN,
+        },
+        body: JSON.stringify({ tier: currentTier.name }),
+      });
+
+      const piData = await piRes.json();
+      if (!piRes.ok || piData.error) {
+        throw new Error(piData.error || 'Failed to initialise payment.');
+      }
+
+      // 2. Confirm card payment with Stripe.js
+      showState('processing');
+
+      const { paymentIntent, error } = await stripe.confirmCardPayment(
+        piData.client_secret,
+        { payment_method: { card: cardElement } },
+      );
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        showState('success');
+        document.getElementById('success-msg').textContent =
+          currentTier.credits + ' credits will appear in your balance shortly.';
+      } else {
+        throw new Error('Payment did not complete. Status: ' + paymentIntent.status);
+      }
+
+    } catch (err) {
+      showState('error');
+      document.getElementById('error-detail').textContent = err.message;
+      setPayBtnLoading(false);
+    }
+  });
+
+  // Retry button
+  document.getElementById('retry-btn').addEventListener('click', () => {
+    showState('form');
+    setPayBtnLoading(false);
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showState(name) {
+    ['form', 'processing', 'success', 'error'].forEach(s => {
+      const el = document.getElementById('state-' + s);
+      el.classList.toggle('active', s === name);
+    });
+    // Only allow closing modal when not mid-payment
+    const closeBtn = document.getElementById('modal-close-btn');
+    closeBtn.style.display = name === 'processing' ? 'none' : '';
+  }
+
+  function setPayBtnLoading(loading) {
+    const btn = document.getElementById('pay-btn');
+    btn.classList.toggle('loading', loading);
+    btn.disabled = loading;
+  }
+
+})();
 </script>
 {% endblock %}

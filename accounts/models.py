@@ -32,6 +32,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     credits = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.CLIENT)
 
+    stripe_customer_id = models.CharField(max_length=255, blank=True, help_text='Stripe Customer ID')
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

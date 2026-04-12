@@ -165,9 +165,15 @@
   {% for pm in payment_methods %}
   <div class="pm-card {% if pm.is_default %}default-card{% endif %}">
     <div class="pm-icon">
-      {% if pm.card_type == 'visa' %}<i class="bi bi-credit-card-2-front" style="color:#1a56db;"></i>
-      {% elif pm.card_type == 'mastercard' %}<i class="bi bi-credit-card-2-front" style="color:#eb001b;"></i>
-      {% else %}<i class="bi bi-credit-card-2-front"></i>{% endif %}
+      {% if pm.card_type == 'visa' %}
+        <i class="bi bi-credit-card-2-front" style="color:#1a56db;"></i>
+      {% elif pm.card_type == 'mastercard' %}
+        <i class="bi bi-credit-card-2-front" style="color:#eb001b;"></i>
+      {% elif pm.card_type == 'amex' %}
+        <i class="bi bi-credit-card-2-front" style="color:#2e77bc;"></i>
+      {% else %}
+        <i class="bi bi-credit-card-2-front"></i>
+      {% endif %}
     </div>
     <div class="flex-grow-1">
       <div style="font-weight:600;font-size:.9rem;color:#e6edf3;">
@@ -178,9 +184,20 @@
     {% if pm.is_default %}
       <span class="badge" style="background:rgba(59,130,246,.2);color:#3b82f6;font-size:.72rem;">Default</span>
     {% else %}
-      <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;">Set Default</button>
+      <form method="post" action="{% url 'billing:pm_set_default' pm.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;">
+          Set Default
+        </button>
+      </form>
     {% endif %}
-    <button class="btn btn-sm btn-outline-danger" style="font-size:.75rem;"><i class="bi bi-trash"></i></button>
+    <form method="post" action="{% url 'billing:pm_delete' pm.pk %}" class="d-inline"
+          onsubmit="return confirm('Remove this card?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:.75rem;">
+        <i class="bi bi-trash"></i>
+      </button>
+    </form>
   </div>
   {% endfor %}
 </div>
@@ -194,20 +211,51 @@
 </div>
 {% endif %}
 
-<!-- Add card modal -->
-<div class="modal fade" id="addCardModal" tabindex="-1">
+<!-- ── Add card modal ─────────────────────────────── -->
+<div class="modal fade" id="addCardModal" tabindex="-1" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
       <div class="modal-header" style="border-bottom:1px solid #21262d;">
-        <h5 class="modal-title fw-semibold" style="color:#e6edf3;"><i class="bi bi-credit-card me-2"></i>Add Payment Method</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title fw-semibold" style="color:#e6edf3;">
+          <i class="bi bi-credit-card me-2"></i>Add Payment Method
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="add-card-close"></button>
       </div>
       <div class="modal-body p-4">
-        <div class="alert py-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);font-size:.8rem;color:#8b949e;">
-          <i class="bi bi-info-circle me-1" style="color:#3b82f6;"></i>
-          Stripe payment integration coming soon. Cards will be stored securely via Stripe.
+
+        <div id="add-card-form">
+          <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">Card Details</label>
+          <div id="setup-card-element" style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:.85rem 1rem;"></div>
+          <div id="setup-error-msg" style="font-size:.82rem;color:#f85149;margin-top:.5rem;min-height:1.2em;"></div>
+
+          <div class="mt-3 mb-4 p-3 rounded d-flex align-items-center gap-2" style="background:#161b22;border:1px solid #21262d;font-size:.78rem;color:#6e7681;">
+            <i class="bi bi-lock-fill" style="color:#3b82f6;font-size:.9rem;flex-shrink:0;"></i>
+            Card saved securely via Stripe. We never store your card number.
+          </div>
+
+          <button id="save-card-btn" class="btn btn-primary w-100 fw-semibold" type="button">
+            <span class="btn-label"><i class="bi bi-plus-circle me-1"></i>Save Card</span>
+            <span class="setup-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none;"></span>
+          </button>
         </div>
-        <button class="btn btn-primary w-100" disabled>Add Card (Coming Soon)</button>
+
+        <div id="add-card-success" style="display:none;text-align:center;padding:1rem 0;">
+          <div style="font-size:2.5rem;">✅</div>
+          <h6 class="fw-bold mt-2 mb-1" style="color:#e6edf3;">Card Saved!</h6>
+          <p style="color:#6e7681;font-size:.875rem;">Your card has been added successfully.</p>
+          <button class="btn btn-outline-success w-100" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Done
+          </button>
+        </div>
+
+        <div id="add-card-error" style="display:none;text-align:center;padding:1rem 0;">
+          <div style="font-size:2.5rem;">❌</div>
+          <p id="add-card-error-detail" style="color:#8b949e;font-size:.85rem;margin-top:.5rem;"></p>
+          <button class="btn btn-outline-secondary w-100" id="add-card-retry">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Try Again
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
@@ -277,4 +325,118 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+{% if active_tab == 'payments' %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+(function () {
+  'use strict';
+
+  const CREATE_SI_URL = '{% url "billing:create_setup_intent" %}';
+  const CSRF_TOKEN    = '{{ csrf_token }}';
+
+  const addCardModal = document.getElementById('addCardModal');
+  if (!addCardModal) return;
+
+  let stripe = null, setupCardEl = null;
+
+  addCardModal.addEventListener('show.bs.modal', () => {
+    const pk = '{{ stripe_pk|default:"" }}';
+    showSection('form');
+
+    if (!pk || pk.startsWith('pk_test_...')) {
+      document.getElementById('setup-card-element').innerHTML =
+        '<div style="color:#d29922;font-size:.82rem;padding:.4rem 0;">' +
+        '<i class="bi bi-exclamation-triangle me-1"></i>' +
+        'Add STRIPE_PUBLISHABLE_KEY to .env to enable card saving.</div>';
+      document.getElementById('save-card-btn').disabled = true;
+      return;
+    }
+
+    if (!stripe) stripe = Stripe(pk);
+    if (setupCardEl) { setupCardEl.destroy(); setupCardEl = null; }
+
+    const elements = stripe.elements({
+      appearance: {
+        theme: 'night',
+        variables: {
+          colorPrimary:'#3b82f6', colorBackground:'#161b22',
+          colorText:'#e6edf3', colorDanger:'#f85149', borderRadius:'8px',
+        },
+      },
+    });
+
+    setupCardEl = elements.create('card', {
+      style: {
+        base: { color:'#e6edf3', fontSize:'15px', '::placeholder':{ color:'#6e7681' } },
+        invalid: { color:'#f85149' },
+      },
+      hidePostalCode: false,
+    });
+    setupCardEl.mount('#setup-card-element');
+    setupCardEl.on('change', e => {
+      document.getElementById('setup-error-msg').textContent = e.error ? e.error.message : '';
+    });
+  });
+
+  addCardModal.addEventListener('hidden.bs.modal', () => {
+    if (setupCardEl) { setupCardEl.destroy(); setupCardEl = null; }
+  });
+
+  document.getElementById('save-card-btn').addEventListener('click', async () => {
+    if (!stripe || !setupCardEl) return;
+    setSaveBtnLoading(true);
+    document.getElementById('setup-error-msg').textContent = '';
+
+    try {
+      const siRes  = await fetch(CREATE_SI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({}),
+      });
+      const siData = await siRes.json();
+      if (!siRes.ok || siData.error) throw new Error(siData.error || 'Failed to initialise card setup.');
+
+      const { setupIntent, error } = await stripe.confirmCardSetup(
+        siData.client_secret,
+        { payment_method: { card: setupCardEl } },
+      );
+
+      if (error) throw new Error(error.message);
+
+      if (setupIntent.status === 'succeeded') {
+        showSection('success');
+      } else {
+        throw new Error('Setup did not complete. Status: ' + setupIntent.status);
+      }
+    } catch (err) {
+      document.getElementById('add-card-error-detail').textContent = err.message;
+      showSection('error');
+      setSaveBtnLoading(false);
+    }
+  });
+
+  document.getElementById('add-card-retry').addEventListener('click', () => {
+    showSection('form');
+    setSaveBtnLoading(false);
+  });
+
+  function showSection(name) {
+    document.getElementById('add-card-form').style.display    = name === 'form'    ? '' : 'none';
+    document.getElementById('add-card-success').style.display = name === 'success' ? '' : 'none';
+    document.getElementById('add-card-error').style.display   = name === 'error'   ? '' : 'none';
+    document.getElementById('add-card-close').style.display   = name === 'form' || name === 'success' ? '' : 'none';
+  }
+
+  function setSaveBtnLoading(on) {
+    const btn = document.getElementById('save-card-btn');
+    btn.disabled = on;
+    btn.querySelector('.btn-label').style.display    = on ? 'none' : '';
+    btn.querySelector('.setup-spinner').style.display = on ? 'inline-block' : 'none';
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

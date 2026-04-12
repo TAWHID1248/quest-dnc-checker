@@ -124,3 +124,8 @@ DEFAULT_FROM_EMAIL = 'noreply@questdnc.com'
 # Scrubber
 SCRUB_BATCH_SIZE = 300_000          # numbers per DNC-check batch
 SCRUB_MAX_FILE_SIZE_MB = 200        # upload cap shown in UI
+
+# Stripe
+STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')

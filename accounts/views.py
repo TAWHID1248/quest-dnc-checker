@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -76,4 +77,5 @@ def profile_view(request):
         'active_tab': active_tab,
         'payment_methods': payment_methods,
         'credit_history': credit_history,
+        'stripe_pk': settings.STRIPE_PUBLISHABLE_KEY,
     })

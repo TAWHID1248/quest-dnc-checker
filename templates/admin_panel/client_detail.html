@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}{{ client.display_name }} — Quest DNC Admin{% endblock %}
+{% block page_title %}Client Detail{% endblock %}
+
+{% block extra_css %}
+<style>
+  .nav-tabs { border-bottom: 1px solid #21262d; }
+  .nav-tabs .nav-link { color:#6e7681; border:none; border-bottom:2px solid transparent; padding:.6rem 1rem; font-size:.875rem; font-weight:500; border-radius:0; background:transparent; }
+  .nav-tabs .nav-link:hover { color:#e6edf3; border-bottom-color:#30363d; }
+  .nav-tabs .nav-link.active { color:#e6edf3; border-bottom-color:#3b82f6; background:transparent; }
+  .info-row { display:flex; justify-content:space-between; padding:.6rem 0; border-bottom:1px solid #21262d; font-size:.875rem; }
+  .info-row:last-child { border-bottom:none; }
+  .info-label { color:#6e7681; }
+  .status-badge,.priority-badge { font-size:.72rem; padding:.2rem .6rem; border-radius:20px; font-weight:600; }
+  .s-completed,.s-resolved,.s-closed { background:#21262d;color:#6e7681; }
+  .s-processing,.s-in_progress { background:#1a2a3a;color:#3b82f6; }
+  .s-pending,.s-queued,.s-waiting { background:#2a2a1a;color:#d29922; }
+  .s-failed { background:#3a1a1a;color:#f85149; }
+  .s-open { background:#1a3a2a;color:#3fb950; }
+  .p-urgent { background:#3a1218;color:#f85149; }
+  .p-high   { background:#3a2a10;color:#d29922; }
+  .p-medium { background:#1a2a3a;color:#3b82f6; }
+  .p-low    { background:#1a2e1a;color:#3fb950; }
+  .avatar-lg { width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#fff;flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Back + header ──────────────────── -->
+<div class="mb-4">
+  <a href="{% url 'admin_panel:client_list' %}" class="btn btn-sm btn-outline-secondary mb-3">
+    <i class="bi bi-arrow-left me-1"></i>Back to Clients
+  </a>
+  <div class="d-flex flex-wrap gap-3 align-items-center">
+    <div class="avatar-lg">{{ client.display_name|first|upper }}</div>
+    <div class="flex-grow-1">
+      <h4 class="fw-bold mb-1" style="color:#e6edf3;">{{ client.display_name }}</h4>
+      <div style="color:#6e7681;font-size:.875rem;">{{ client.email }}</div>
+      <div class="mt-1 d-flex gap-2 flex-wrap">
+        {% if client.is_active %}
+          <span class="badge" style="background:#1a3a2a;color:#3fb950;">Active</span>
+        {% else %}
+          <span class="badge" style="background:#3a1a1a;color:#f85149;">Inactive</span>
+        {% endif %}
+        <span class="badge bg-secondary">{{ client.get_role_display }}</span>
+        {% if client.company %}<span class="badge" style="background:#161b22;color:#8b949e;border:1px solid #21262d;">{{ client.company }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <!-- Toggle active -->
+      <form method="post" action="{% url 'admin_panel:client_toggle' client.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <button type="submit"
+          class="btn btn-sm {% if client.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+          onclick="return confirm('{% if client.is_active %}Deactivate{% else %}Activate{% endif %} this account?')"
+        >
+          <i class="bi {% if client.is_active %}bi-person-slash{% else %}bi-person-check{% endif %} me-1"></i>
+          {% if client.is_active %}Deactivate{% else %}Activate{% endif %}
+        </button>
+      </form>
+      <!-- Adjust credits -->
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#creditsModal">
+        <i class="bi bi-coin me-1"></i>Adjust Credits
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats row ─────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Credit Balance</div>
+      <div class="stat-value" style="color:#3fb950;">{{ client.credits|floatformat:0 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Total Spent</div>
+      <div class="stat-value">${{ total_spent|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Numbers Scrubbed</div>
+      <div class="stat-value">{{ stats.total_numbers|default:0 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">DNC Found</div>
+      <div class="stat-value" style="color:#f85149;">{{ stats.total_dnc|default:0 }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabs ──────────────────────────── -->
+<ul class="nav nav-tabs mb-4" id="detailTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#info-tab"><i class="bi bi-person me-1"></i>Info</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#scrubs-tab"><i class="bi bi-funnel me-1"></i>Scrub Jobs</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#payments-tab"><i class="bi bi-credit-card me-1"></i>Payments</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tickets-tab"><i class="bi bi-headset me-1"></i>Tickets</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#credits-tab"><i class="bi bi-clock-history me-1"></i>Credit Log</a></li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- Info -->
+  <div class="tab-pane fade show active" id="info-tab">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header py-3"><h6 class="mb-0 fw-semibold">Account Information</h6></div>
+          <div class="card-body p-4">
+            <div class="info-row"><span class="info-label">Full Name</span><span>{{ client.name|default:"—" }}</span></div>
+            <div class="info-row"><span class="info-label">Email</span><span>{{ client.email }}</span></div>
+            <div class="info-row"><span class="info-label">Phone</span><span>{{ client.phone|default:"—" }}</span></div>
+            <div class="info-row"><span class="info-label">Company</span><span>{{ client.company|default:"—" }}</span></div>
+            <div class="info-row"><span class="info-label">Date Joined</span><span>{{ client.date_joined|date:"F j, Y g:i A" }}</span></div>
+            <div class="info-row"><span class="info-label">Last Login</span><span>{{ client.last_login|date:"F j, Y g:i A"|default:"Never" }}</span></div>
+            <div class="info-row"><span class="info-label">Account Status</span>
+              <span>{% if client.is_active %}<span style="color:#3fb950;">Active</span>{% else %}<span style="color:#f85149;">Inactive</span>{% endif %}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrub Jobs -->
+  <div class="tab-pane fade" id="scrubs-tab">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.84rem;">
+          <thead><tr><th>Job ID</th><th>Filename</th><th class="text-center">Total</th><th class="text-center">Clean</th><th class="text-center">DNC</th><th class="text-center">Status</th><th class="text-end">Date</th><th class="text-center">Download</th></tr></thead>
+          <tbody>
+            {% for job in scrub_jobs %}
+            <tr>
+              <td><span style="color:#3b82f6;font-family:monospace;font-size:.78rem;">{{ job.job_id }}</span></td>
+              <td style="max-width:160px;" class="text-truncate" title="{{ job.filename }}">{{ job.filename }}</td>
+              <td class="text-center">{{ job.total }}</td>
+              <td class="text-center" style="color:#3fb950;">{{ job.clean }}</td>
+              <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
+              <td class="text-center"><span class="status-badge s-{{ job.status }}">{{ job.get_status_display }}</span></td>
+              <td class="text-end" style="color:#6e7681;">{{ job.created_at|date:"M d, Y" }}</td>
+              <td class="text-center">
+                {% if job.result_file and job.status == 'completed' %}
+                  <a href="{{ job.result_file.url }}" class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i></a>
+                {% else %}
+                  <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center py-4" style="color:#6e7681;">No scrub jobs yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payments -->
+  <div class="tab-pane fade" id="payments-tab">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.84rem;">
+          <thead><tr><th>Payment ID</th><th class="text-center">Amount</th><th class="text-center">Credits</th><th class="text-center">Status</th><th>Stripe PI</th><th class="text-end">Date</th></tr></thead>
+          <tbody>
+            {% for p in payments %}
+            <tr>
+              <td><span style="font-family:monospace;color:#3b82f6;font-size:.78rem;">{{ p.payment_id }}</span></td>
+              <td class="text-center">${{ p.amount }}</td>
+              <td class="text-center" style="color:#3fb950;">{{ p.credits|floatformat:0 }}</td>
+              <td class="text-center"><span class="status-badge s-{{ p.status }}">{{ p.get_status_display }}</span></td>
+              <td style="font-size:.75rem;color:#6e7681;font-family:monospace;">{{ p.stripe_pi_id|default:"—"|truncatechars:24 }}</td>
+              <td class="text-end" style="color:#6e7681;">{{ p.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-4" style="color:#6e7681;">No payments yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tickets -->
+  <div class="tab-pane fade" id="tickets-tab">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.84rem;">
+          <thead><tr><th>Ticket ID</th><th>Subject</th><th class="text-center">Priority</th><th class="text-center">Status</th><th class="text-end">Date</th></tr></thead>
+          <tbody>
+            {% for t in tickets %}
+            <tr>
+              <td><span style="font-family:monospace;color:#3b82f6;font-size:.78rem;">{{ t.ticket_id }}</span></td>
+              <td style="max-width:220px;" class="text-truncate" title="{{ t.subject }}">{{ t.subject }}</td>
+              <td class="text-center"><span class="priority-badge p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+              <td class="text-center"><span class="status-badge s-{{ t.status }}">{{ t.get_status_display }}</span></td>
+              <td class="text-end" style="color:#6e7681;">{{ t.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-4" style="color:#6e7681;">No support tickets.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credit Log -->
+  <div class="tab-pane fade" id="credits-tab">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.84rem;">
+          <thead><tr><th>TXN ID</th><th>Type</th><th>Description</th><th class="text-end">Amount</th><th class="text-end">USD</th><th class="text-end">Date</th></tr></thead>
+          <tbody>
+            {% for txn in txns %}
+            <tr>
+              <td><span style="font-family:monospace;color:#3b82f6;font-size:.75rem;">{{ txn.transaction_id }}</span></td>
+              <td>
+                {% if txn.type == 'purchase' %}<span class="badge" style="background:#1a3a2a;color:#3fb950;">Purchase</span>
+                {% elif txn.type == 'usage' %}<span class="badge" style="background:#2a1a1a;color:#f85149;">Usage</span>
+                {% elif txn.type == 'refund' %}<span class="badge" style="background:#1a2a3a;color:#3b82f6;">Refund</span>
+                {% else %}<span class="badge bg-secondary">{{ txn.get_type_display }}</span>{% endif %}
+              </td>
+              <td style="color:#8b949e;">{% if txn.scrub_job %}Job {{ txn.scrub_job.job_id }}{% else %}—{% endif %}</td>
+              <td class="text-end fw-semibold" style="color:{% if txn.amount >= 0 %}#3fb950{% else %}#f85149{% endif %};">
+                {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }}
+              </td>
+              <td class="text-end" style="color:#6e7681;">{% if txn.price %}${{ txn.price }}{% else %}—{% endif %}</td>
+              <td class="text-end" style="color:#6e7681;">{{ txn.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-4" style="color:#6e7681;">No transactions.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.tab-content -->
+
+<!-- ── Adjust Credits Modal ──────────── -->
+<div class="modal fade" id="creditsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
+      <div class="modal-header" style="border-bottom:1px solid #21262d;">
+        <h5 class="modal-title fw-semibold" style="color:#e6edf3;font-size:.95rem;">
+          <i class="bi bi-coin me-2 text-primary"></i>Adjust Credits
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'admin_panel:client_credits' client.id %}">
+        {% csrf_token %}
+        <div class="modal-body p-4">
+          <div class="mb-2" style="font-size:.8rem;color:#6e7681;">
+            Current balance: <strong style="color:#3fb950;">{{ client.credits|floatformat:0 }} credits</strong>
+          </div>
+          <label class="form-label" style="font-size:.85rem;color:#8b949e;">Amount (use negative to deduct)</label>
+          <input type="number" name="amount" class="form-control" placeholder="e.g. 1000 or -500" required>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid #21262d;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Client Management — Quest DNC{% endblock %}
+{% block page_title %}Client Management{% endblock %}
+
+{% block extra_css %}
+<style>
+  .mini-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg,#3b82f6,#1d4ed8);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: .82rem; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .filter-btn { font-size:.8rem; padding:.3rem .8rem; }
+  .filter-btn.active-filter { background:#3b82f6!important; border-color:#3b82f6!important; color:#fff!important; }
+  tr.client-row { cursor: pointer; transition: background .12s; }
+  tr.client-row:hover td { background: rgba(255,255,255,.03); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Header + Search ─────────────────── -->
+<div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">Client Management</h4>
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">{{ total }} client{{ total|pluralize }} found</p>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+      <div class="flex-grow-1" style="min-width:220px;">
+        <div class="input-group">
+          <span class="input-group-text" style="background:#161b22;border-color:#30363d;color:#6e7681;">
+            <i class="bi bi-search"></i>
+          </span>
+          <input
+            type="text" name="q" value="{{ q }}"
+            class="form-control" placeholder="Search by name, email or company…"
+          >
+          {% if q %}<button type="button" class="btn btn-outline-secondary" onclick="this.form.q.value='';this.form.submit()"><i class="bi bi-x"></i></button>{% endif %}
+        </div>
+      </div>
+      <div class="d-flex gap-1">
+        <a href="?{% if q %}q={{ q }}&{% endif %}" class="btn btn-sm btn-outline-secondary filter-btn {% if not status %}active-filter{% endif %}">All</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=active" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'active' %}active-filter{% endif %}">Active</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=inactive" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'inactive' %}active-filter{% endif %}">Inactive</a>
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Client table ────────────────────── -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.85rem;">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Company</th>
+          <th>Phone</th>
+          <th class="text-center">Credits</th>
+          <th class="text-center">Scrubs</th>
+          <th class="text-center">Payments</th>
+          <th class="text-center">Status</th>
+          <th class="text-end">Joined</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+        <tr class="client-row" onclick="window.location='{% url 'admin_panel:client_detail' c.id %}'">
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="mini-avatar">{{ c.display_name|first|upper }}</div>
+              <div>
+                <div style="font-weight:600;color:#e6edf3;">{{ c.display_name|truncatechars:24 }}</div>
+                <div style="font-size:.75rem;color:#6e7681;">{{ c.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:#8b949e;">{{ c.company|default:"—" }}</td>
+          <td style="color:#8b949e;">{{ c.phone|default:"—" }}</td>
+          <td class="text-center" style="color:#3fb950;font-weight:600;">{{ c.credits|floatformat:0 }}</td>
+          <td class="text-center">{{ c.scrub_count }}</td>
+          <td class="text-center">{{ c.payment_count }}</td>
+          <td class="text-center">
+            {% if c.is_active %}
+              <span class="badge" style="background:#1a3a2a;color:#3fb950;">Active</span>
+            {% else %}
+              <span class="badge" style="background:#3a1a1a;color:#f85149;">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-end" style="color:#6e7681;">{{ c.date_joined|date:"M d, Y" }}</td>
+          <td class="text-center" onclick="event.stopPropagation()">
+            <div class="d-flex gap-1 justify-content-center">
+              <a href="{% url 'admin_panel:client_detail' c.id %}" class="btn btn-sm btn-outline-secondary" title="View detail">
+                <i class="bi bi-eye"></i>
+              </a>
+              <form method="post" action="{% url 'admin_panel:client_toggle' c.id %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'admin_panel:client_list' %}">
+                <button type="submit"
+                  class="btn btn-sm {% if c.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                  title="{% if c.is_active %}Deactivate{% else %}Activate{% endif %}"
+                  onclick="return confirm('{% if c.is_active %}Deactivate{% else %}Activate{% endif %} {{ c.email }}?')"
+                >
+                  <i class="bi {% if c.is_active %}bi-person-slash{% else %}bi-person-check{% endif %}"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center py-5" style="color:#6e7681;">
+            <i class="bi bi-people fs-2 d-block mb-2"></i>
+            No clients found{% if q %} matching "<strong>{{ q }}</strong>"{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

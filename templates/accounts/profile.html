@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Profile — Quest DNC{% endblock %}
+{% block page_title %}Profile & Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+  .nav-tabs { border-bottom: 1px solid #21262d; }
+  .nav-tabs .nav-link {
+    color: #6e7681;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: .65rem 1.1rem;
+    font-size: .875rem;
+    font-weight: 500;
+    border-radius: 0;
+    background: transparent;
+  }
+  .nav-tabs .nav-link:hover { color: #e6edf3; border-bottom-color: #30363d; }
+  .nav-tabs .nav-link.active { color: #e6edf3; border-bottom-color: #3b82f6; background: transparent; }
+  .pm-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .pm-card.default-card { border-color: #3b82f6; }
+  .pm-icon {
+    width: 44px; height: 32px;
+    background: #21262d;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: #8b949e; flex-shrink: 0;
+  }
+  .txn-debit  { color: #f85149; }
+  .txn-credit { color: #3fb950; }
+  .avatar-circle {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; font-weight: 700; color: #fff;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Profile header ───────────────────────────── -->
+<div class="d-flex align-items-center gap-3 mb-4">
+  <div class="avatar-circle">{{ user.display_name|first|upper }}</div>
+  <div>
+    <h5 class="fw-bold mb-0" style="color:#e6edf3;">{{ user.display_name }}</h5>
+    <div style="color:#6e7681;font-size:.875rem;">{{ user.email }}</div>
+    <span class="badge mt-1 {% if user.is_admin %}bg-primary{% else %}bg-secondary{% endif %}">
+      {{ user.get_role_display }}
+    </span>
+  </div>
+  <div class="ms-auto text-end">
+    <div style="font-size:.75rem;color:#6e7681;">Credit Balance</div>
+    <div style="font-size:1.75rem;font-weight:700;color:#3fb950;line-height:1;">{{ user.credits|floatformat:0 }}</div>
+    <div style="font-size:.75rem;color:#6e7681;">credits</div>
+  </div>
+</div>
+
+<!-- ── Tabs ─────────────────────────────────────── -->
+<ul class="nav nav-tabs mb-4" id="profileTabs">
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'profile' %}active{% endif %}" href="?tab=profile">
+      <i class="bi bi-person me-1"></i>Profile
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'payments' %}active{% endif %}" href="?tab=payments">
+      <i class="bi bi-credit-card me-1"></i>Payment Methods
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if active_tab == 'history' %}active{% endif %}" href="?tab=history">
+      <i class="bi bi-clock-history me-1"></i>Credit History
+    </a>
+  </li>
+</ul>
+
+<!-- ── TAB: Profile ─────────────────────────────── -->
+{% if active_tab == 'profile' %}
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-semibold">Edit Profile</h6>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {% for field in form %}
+          <div class="mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label" style="font-size:.85rem;color:#8b949e;">
+              {{ field.label }}
+            </label>
+            {{ field }}
+            {% if field.errors %}
+              <div class="text-danger mt-1" style="font-size:.8rem;">{{ field.errors.0 }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          <hr style="border-color:#21262d;">
+          <div class="mb-3">
+            <label class="form-label" style="font-size:.85rem;color:#8b949e;">Email address</label>
+            <input type="email" class="form-control" value="{{ user.email }}" disabled>
+            <div class="mt-1" style="font-size:.75rem;color:#6e7681;">Contact support to change your email address.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5 mt-4 mt-lg-0 ms-lg-auto">
+    <div class="card">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-semibold">Account Details</h6>
+      </div>
+      <div class="card-body p-4">
+        <dl style="font-size:.875rem;">
+          <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid #21262d;">
+            <dt style="color:#6e7681;font-weight:400;">Member since</dt>
+            <dd class="mb-0">{{ user.date_joined|date:"F j, Y" }}</dd>
+          </div>
+          <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid #21262d;">
+            <dt style="color:#6e7681;font-weight:400;">Account role</dt>
+            <dd class="mb-0">
+              <span class="badge {% if user.is_admin %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ user.get_role_display }}
+              </span>
+            </dd>
+          </div>
+          <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid #21262d;">
+            <dt style="color:#6e7681;font-weight:400;">Credits</dt>
+            <dd class="mb-0" style="color:#3fb950;font-weight:600;">{{ user.credits|floatformat:0 }}</dd>
+          </div>
+          <div class="d-flex justify-content-between py-2">
+            <dt style="color:#6e7681;font-weight:400;">Last login</dt>
+            <dd class="mb-0">{{ user.last_login|date:"M j, Y g:i A"|default:"—" }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: Payment Methods ─────────────────────── -->
+{% elif active_tab == 'payments' %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="mb-0 fw-semibold" style="color:#e6edf3;">Saved Payment Methods</h6>
+  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addCardModal">
+    <i class="bi bi-plus me-1"></i>Add Card
+  </button>
+</div>
+
+{% if payment_methods %}
+<div class="d-flex flex-column gap-3" style="max-width:560px;">
+  {% for pm in payment_methods %}
+  <div class="pm-card {% if pm.is_default %}default-card{% endif %}">
+    <div class="pm-icon">
+      {% if pm.card_type == 'visa' %}<i class="bi bi-credit-card-2-front" style="color:#1a56db;"></i>
+      {% elif pm.card_type == 'mastercard' %}<i class="bi bi-credit-card-2-front" style="color:#eb001b;"></i>
+      {% else %}<i class="bi bi-credit-card-2-front"></i>{% endif %}
+    </div>
+    <div class="flex-grow-1">
+      <div style="font-weight:600;font-size:.9rem;color:#e6edf3;">
+        {{ pm.get_card_type_display }} •••• {{ pm.last4 }}
+      </div>
+      <div style="font-size:.78rem;color:#6e7681;">Expires {{ pm.exp_date }}</div>
+    </div>
+    {% if pm.is_default %}
+      <span class="badge" style="background:rgba(59,130,246,.2);color:#3b82f6;font-size:.72rem;">Default</span>
+    {% else %}
+      <button class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;">Set Default</button>
+    {% endif %}
+    <button class="btn btn-sm btn-outline-danger" style="font-size:.75rem;"><i class="bi bi-trash"></i></button>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card p-5 text-center" style="max-width:560px;">
+  <i class="bi bi-credit-card fs-1 mb-3 d-block" style="color:#6e7681;"></i>
+  <div style="color:#8b949e;font-size:.9rem;">No payment methods saved yet.</div>
+  <button class="btn btn-outline-primary btn-sm mt-3" data-bs-toggle="modal" data-bs-target="#addCardModal">
+    <i class="bi bi-plus me-1"></i>Add a Card
+  </button>
+</div>
+{% endif %}
+
+<!-- Add card modal -->
+<div class="modal fade" id="addCardModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
+      <div class="modal-header" style="border-bottom:1px solid #21262d;">
+        <h5 class="modal-title fw-semibold" style="color:#e6edf3;"><i class="bi bi-credit-card me-2"></i>Add Payment Method</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert py-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);font-size:.8rem;color:#8b949e;">
+          <i class="bi bi-info-circle me-1" style="color:#3b82f6;"></i>
+          Stripe payment integration coming soon. Cards will be stored securely via Stripe.
+        </div>
+        <button class="btn btn-primary w-100" disabled>Add Card (Coming Soon)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: Credit History ───────────────────────── -->
+{% elif active_tab == 'history' %}
+<div class="card">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-semibold">Credit Transaction History</h6>
+    <span style="font-size:.8rem;color:#6e7681;">Last 50 transactions</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.85rem;">
+      <thead>
+        <tr>
+          <th>Transaction ID</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">USD</th>
+          <th class="text-end">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in credit_history %}
+        <tr>
+          <td><span style="font-family:monospace;color:#3b82f6;font-size:.78rem;">{{ txn.transaction_id }}</span></td>
+          <td>
+            {% if txn.type == 'purchase' %}
+              <span class="badge" style="background:#1a3a2a;color:#3fb950;">Purchase</span>
+            {% elif txn.type == 'usage' %}
+              <span class="badge" style="background:#2a1a1a;color:#f85149;">Usage</span>
+            {% elif txn.type == 'refund' %}
+              <span class="badge" style="background:#1a2a3a;color:#3b82f6;">Refund</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ txn.get_type_display }}</span>
+            {% endif %}
+          </td>
+          <td style="color:#8b949e;">
+            {% if txn.scrub_job %}
+              Job {{ txn.scrub_job.job_id }}
+            {% elif txn.type == 'purchase' %}
+              Credit purchase
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="text-end fw-semibold {% if txn.amount >= 0 %}txn-credit{% else %}txn-debit{% endif %}">
+            {% if txn.amount >= 0 %}+{% endif %}{{ txn.amount|floatformat:0 }}
+          </td>
+          <td class="text-end" style="color:#6e7681;">
+            {% if txn.price %} ${{ txn.price }} {% else %} — {% endif %}
+          </td>
+          <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ txn.created_at|date:"M d, Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-5" style="color:#6e7681;">
+            <i class="bi bi-clock-history fs-2 d-block mb-2"></i>No transactions yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

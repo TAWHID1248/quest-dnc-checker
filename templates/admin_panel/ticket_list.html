@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Support Tickets — Quest DNC Admin{% endblock %}
+{% block page_title %}Support Tickets{% endblock %}
+
+{% block extra_css %}
+<style>
+  .status-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+  .stab {
+    padding:.35rem .9rem; border-radius:20px; font-size:.8rem; font-weight:600;
+    border:1px solid #21262d; color:#6e7681; text-decoration:none; transition:.15s;
+  }
+  .stab:hover { color:#e6edf3; border-color:#30363d; }
+  .stab.active { color:#fff; }
+  .stab-all.active    { background:#21262d; border-color:#30363d; color:#e6edf3; }
+  .stab-open.active   { background:#1a3a2a; border-color:#3fb950; color:#3fb950; }
+  .stab-in_progress.active { background:#1a2a3a; border-color:#3b82f6; color:#3b82f6; }
+  .stab-waiting.active { background:#2a2a1a; border-color:#d29922; color:#d29922; }
+  .stab-resolved.active, .stab-closed.active { background:#21262d; border-color:#6e7681; color:#6e7681; }
+  .count-pill { font-size:.68rem; background:#21262d; border-radius:10px; padding:.1rem .45rem; margin-left:.3rem; }
+  .priority-badge,.status-badge { font-size:.72rem; padding:.2rem .6rem; border-radius:20px; font-weight:600; }
+  .p-urgent { background:#3a1218;color:#f85149; }
+  .p-high   { background:#3a2a10;color:#d29922; }
+  .p-medium { background:#1a2a3a;color:#3b82f6; }
+  .p-low    { background:#1a2e1a;color:#3fb950; }
+  .s-open        { background:#1a3a2a;color:#3fb950; }
+  .s-in_progress { background:#1a2a3a;color:#3b82f6; }
+  .s-waiting     { background:#2a2a1a;color:#d29922; }
+  .s-resolved,.s-closed { background:#21262d;color:#6e7681; }
+  .mini-avatar { width:28px;height:28px;border-radius:50%;background:#21262d;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#e6edf3;flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">Support Tickets</h4>
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">{{ counts.all }} total ticket{{ counts.all|pluralize }}</p>
+  </div>
+</div>
+
+<!-- ── Status filter tabs ─────────────── -->
+<div class="status-tabs">
+  <a href="?{% if q %}q={{ q }}&{% endif %}{% if priority_filter %}priority={{ priority_filter }}{% endif %}"
+     class="stab stab-all {% if not status_filter %}active{% endif %}">
+    All <span class="count-pill">{{ counts.all }}</span>
+  </a>
+  <a href="?status=open{% if q %}&q={{ q }}{% endif %}"
+     class="stab stab-open {% if status_filter == 'open' %}active{% endif %}">
+    Open <span class="count-pill">{{ counts.open }}</span>
+  </a>
+  <a href="?status=in_progress{% if q %}&q={{ q }}{% endif %}"
+     class="stab stab-in_progress {% if status_filter == 'in_progress' %}active{% endif %}">
+    In Progress <span class="count-pill">{{ counts.in_progress }}</span>
+  </a>
+  <a href="?status=waiting{% if q %}&q={{ q }}{% endif %}"
+     class="stab stab-waiting {% if status_filter == 'waiting' %}active{% endif %}">
+    Waiting <span class="count-pill">{{ counts.waiting }}</span>
+  </a>
+  <a href="?status=resolved{% if q %}&q={{ q }}{% endif %}"
+     class="stab stab-resolved {% if status_filter == 'resolved' %}active{% endif %}">
+    Resolved <span class="count-pill">{{ counts.resolved }}</span>
+  </a>
+  <a href="?status=closed{% if q %}&q={{ q }}{% endif %}"
+     class="stab stab-closed {% if status_filter == 'closed' %}active{% endif %}">
+    Closed <span class="count-pill">{{ counts.closed }}</span>
+  </a>
+</div>
+
+<!-- ── Filters ────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+      {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+      <div class="flex-grow-1" style="min-width:200px;">
+        <div class="input-group">
+          <span class="input-group-text" style="background:#161b22;border-color:#30363d;color:#6e7681;"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search ticket ID, subject or email…">
+        </div>
+      </div>
+      <select name="priority" class="form-select" style="width:auto;">
+        <option value="">All Priorities</option>
+        <option value="urgent" {% if priority_filter == 'urgent' %}selected{% endif %}>Urgent</option>
+        <option value="high"   {% if priority_filter == 'high'   %}selected{% endif %}>High</option>
+        <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
+        <option value="low"    {% if priority_filter == 'low'    %}selected{% endif %}>Low</option>
+      </select>
+      <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+      <a href="{% url 'admin_panel:ticket_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </form>
+  </div>
+</div>
+
+<!-- ── Ticket table ───────────────────── -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.85rem;">
+      <thead>
+        <tr>
+          <th>Ticket</th>
+          <th>Client</th>
+          <th class="text-center">Priority</th>
+          <th class="text-center">Status</th>
+          <th class="text-end">Created</th>
+          <th class="text-end">Updated</th>
+          <th class="text-center">Change Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tickets %}
+        <tr>
+          <td style="min-width:220px;">
+            <div style="font-weight:600;color:#e6edf3;">{{ t.subject|truncatechars:40 }}</div>
+            <div style="font-size:.75rem;color:#6e7681;font-family:monospace;">{{ t.ticket_id }}</div>
+            <div style="font-size:.75rem;color:#6e7681;margin-top:.2rem;">{{ t.description|truncatechars:60 }}</div>
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="mini-avatar">{{ t.user.display_name|first|upper }}</div>
+              <div>
+                <div style="font-size:.82rem;color:#e6edf3;">{{ t.user.display_name|truncatechars:18 }}</div>
+                <div style="font-size:.73rem;color:#6e7681;">{{ t.user.email|truncatechars:22 }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="text-center"><span class="priority-badge p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
+          <td class="text-center"><span class="status-badge s-{{ t.status }}">{{ t.get_status_display }}</span></td>
+          <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ t.created_at|date:"M d, Y" }}</td>
+          <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ t.updated_at|date:"M d, Y" }}</td>
+          <td class="text-center" style="min-width:160px;">
+            <form method="post" action="{% url 'admin_panel:ticket_status' t.id %}" class="d-flex gap-1 justify-content-center">
+              {% csrf_token %}
+              <select name="status" class="form-select form-select-sm" style="width:auto;font-size:.78rem;">
+                <option value="open"        {% if t.status == 'open'        %}selected{% endif %}>Open</option>
+                <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                <option value="waiting"     {% if t.status == 'waiting'     %}selected{% endif %}>Waiting</option>
+                <option value="resolved"    {% if t.status == 'resolved'    %}selected{% endif %}>Resolved</option>
+                <option value="closed"      {% if t.status == 'closed'      %}selected{% endif %}>Closed</option>
+              </select>
+              <button type="submit" class="btn btn-sm btn-outline-primary" title="Update status"><i class="bi bi-check2"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:#6e7681;">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            No tickets found{% if status_filter %} with status "{{ status_filter }}"{% endif %}{% if q %} matching "{{ q }}"{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

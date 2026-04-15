@@ -205,6 +205,71 @@ def set_default_payment_method(request, pm_id):
     return redirect('/accounts/profile/?tab=payments')
 
 
+# ── Payment complete (frontend callback after confirmCardPayment) ─────────────
+
+@login_required
+@require_POST
+def payment_complete(request):
+    """
+    Called by the frontend immediately after stripe.confirmCardPayment() succeeds.
+    Retrieves the PaymentIntent from Stripe to verify status, then credits the user.
+
+    This is the primary credit-delivery path for local dev (where the Stripe CLI
+    webhook forwarder may not be running).  The webhook handler is kept as a
+    belt-and-suspenders fallback — both are idempotent via the stripe_pi_id
+    unique constraint on Payment.
+
+    Always returns JSON — never HTML — so the frontend can parse the response.
+    """
+    try:
+        # ── Parse request ────────────────────────────────────────────────
+        try:
+            data = json.loads(request.body)
+            pi_id = data.get('payment_intent_id', '').strip()
+        except (json.JSONDecodeError, AttributeError):
+            return JsonResponse({'error': 'Invalid request body.'}, status=400)
+
+        if not pi_id or not pi_id.startswith('pi_'):
+            return JsonResponse({'error': 'Invalid payment_intent_id.'}, status=400)
+
+        # ── Retrieve & verify PaymentIntent from Stripe ──────────────────
+        try:
+            pi = stripe.PaymentIntent.retrieve(pi_id)
+        except stripe.error.StripeError as exc:
+            logger.exception("Could not retrieve PaymentIntent %s", pi_id)
+            msg = getattr(exc, 'user_message', None) or str(exc)
+            return JsonResponse({'error': msg}, status=502)
+
+        import json as _json
+        pi_dict = _json.loads(str(pi))   # normalise StripeObject → plain dict
+
+        if pi_dict.get('status') != 'succeeded':
+            return JsonResponse(
+                {'error': f"Payment not completed (status: {pi_dict.get('status')})."},
+                status=402,
+            )
+
+        # ── Verify the PI belongs to this user ───────────────────────────
+        user_id_meta = pi_dict.get('metadata', {}).get('user_id')
+        if str(user_id_meta) != str(request.user.pk):
+            logger.warning(
+                "payment_complete: PI %s metadata user_id=%s != request user %s",
+                pi_id, user_id_meta, request.user.pk,
+            )
+            return JsonResponse({'error': 'Payment does not belong to your account.'}, status=403)
+
+        # ── Credit the account (idempotent) ─────────────────────────────
+        handle_payment_intent_succeeded(pi_dict)
+
+        # ── Return updated balance ───────────────────────────────────────
+        request.user.refresh_from_db()
+        return JsonResponse({'ok': True, 'credits': request.user.credits})
+
+    except Exception:
+        logger.exception("Unhandled error in payment_complete for user %s", request.user.pk)
+        return JsonResponse({'error': 'An unexpected error occurred. Contact support.'}, status=500)
+
+
 # ── Stripe Webhook ────────────────────────────────────────────────────────────
 
 @csrf_exempt

@@ -214,9 +214,10 @@
 {% block extra_js %}
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-  var STRIPE_CONFIG_URL = '{% url "billing:stripe_config" %}';
-  var CREATE_PI_URL     = '{% url "billing:create_payment_intent" %}';
-  var CSRF_TOKEN        = '{{ csrf_token }}';
+  var STRIPE_CONFIG_URL    = '{% url "billing:stripe_config" %}';
+  var CREATE_PI_URL        = '{% url "billing:create_payment_intent" %}';
+  var PAYMENT_COMPLETE_URL = '{% url "billing:payment_complete" %}';
+  var CSRF_TOKEN           = '{{ csrf_token }}';
   var stripeObj         = null;
   var cardElement       = null;
   var currentTier       = null;
@@ -339,9 +340,21 @@
         });
         if (result.error) throw new Error(result.error.message);
         if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+          // Notify the server to credit the account immediately
+          var completeRes = await fetch(PAYMENT_COMPLETE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ payment_intent_id: result.paymentIntent.id }),
+          });
+          var completeData = await completeRes.json();
+          if (!completeRes.ok || completeData.error) throw new Error(completeData.error || 'Failed to apply credits.');
+
           showState('success');
+          var newBalance = completeData.credits !== undefined
+            ? Number(completeData.credits).toLocaleString() + ' credits'
+            : currentTier.credits + ' credits';
           document.getElementById('success-msg').textContent =
-            currentTier.credits + ' credits will appear in your balance shortly.';
+            currentTier.credits + ' credits added! New balance: ' + newBalance + '.';
         } else {
           throw new Error('Unexpected status: ' + (result.paymentIntent ? result.paymentIntent.status : '?'));
         }

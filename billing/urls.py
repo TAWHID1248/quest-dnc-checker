@@ -15,6 +15,9 @@ urlpatterns = [
     path('payment-method/<int:pm_id>/delete/',      views.delete_payment_method,      name='pm_delete'),
     path('payment-method/<int:pm_id>/set-default/', views.set_default_payment_method, name='pm_set_default'),
 
+    # Frontend callback after confirmCardPayment succeeds
+    path('payment-complete/', views.payment_complete, name='payment_complete'),
+
     # Stripe webhook (csrf_exempt inside the view)
     path('webhook/', views.stripe_webhook, name='webhook'),
 ]

@@ -21,6 +21,14 @@ User = get_user_model()
 
 # ── payment_intent.succeeded ─────────────────────────────────────────────────
 
+def _as_dict(obj):
+    """Convert a Stripe SDK object (v15+) or plain dict to a plain dict."""
+    import json
+    if isinstance(obj, dict):
+        return obj
+    return json.loads(str(obj))
+
+
 def handle_payment_intent_succeeded(pi) -> None:
     """
     Credit the user after a successful payment.
@@ -28,7 +36,8 @@ def handle_payment_intent_succeeded(pi) -> None:
     Idempotent: guarded by Payment.stripe_pi_id unique constraint — a second
     call for the same PaymentIntent will hit IntegrityError which we swallow.
     """
-    metadata = pi.get('metadata', {})
+    pi        = _as_dict(pi)
+    metadata  = pi.get('metadata', {})
     user_id   = metadata.get('user_id')
     tier_name = metadata.get('tier_name', '')
     credits   = int(metadata.get('credits', 0))
@@ -90,6 +99,7 @@ def handle_payment_intent_succeeded(pi) -> None:
 
 def handle_payment_intent_failed(pi) -> None:
     """Mark an existing pending Payment as failed, if one exists."""
+    pi = _as_dict(pi)
     payment = Payment.objects.filter(stripe_pi_id=pi['id']).first()
     if payment and payment.status == Payment.Status.PENDING:
         payment.status = Payment.Status.FAILED
@@ -104,6 +114,7 @@ def handle_setup_intent_succeeded(si) -> None:
     Save a new PaymentMethod after the user completes card setup.
     Makes it the default if the user has no existing default.
     """
+    si        = _as_dict(si)
     metadata  = si.get('metadata', {})
     pm_id     = si.get('payment_method')
     customer_id = si.get('customer')

@@ -310,25 +310,38 @@
     }
 
     /* ── Mobile sidebar toggle ───────────────────────────── */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 1039;
+      cursor: pointer;
+    }
+    .sidebar-overlay.show {
+      display: block;
+    }
+
     @media (max-width: 991.98px) {
       #sidebar {
         transform: translateX(-100%);
+        box-shadow: none;
       }
       #sidebar.show {
         transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.5);
       }
       #main-content {
         margin-left: 0;
       }
-      .sidebar-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.6);
-        z-index: 1039;
+      body.sidebar-open {
+        overflow: hidden;
       }
-      .sidebar-overlay.show {
-        display: block;
+      .page-content {
+        padding: 1.25rem 1rem;
+      }
+      #topbar {
+        padding: 0 1rem;
       }
     }
   </style>
@@ -448,13 +461,30 @@
 
 <script>
   function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('show');
-    document.getElementById('sidebarOverlay').classList.toggle('show');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isOpen = sidebar.classList.toggle('show');
+    overlay.classList.toggle('show', isOpen);
+    document.body.classList.toggle('sidebar-open', isOpen);
   }
+
   function closeSidebar() {
     document.getElementById('sidebar').classList.remove('show');
     document.getElementById('sidebarOverlay').classList.remove('show');
+    document.body.classList.remove('sidebar-open');
   }
+
+  // Close sidebar on mobile when any nav link is clicked
+  document.querySelectorAll('#sidebar .nav-link').forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth < 992) closeSidebar();
+    });
+  });
+
+  // Close sidebar when pressing Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSidebar();
+  });
 </script>
 
 {% block extra_js %}{% endblock %}

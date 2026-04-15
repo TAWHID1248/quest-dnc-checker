@@ -87,6 +87,12 @@ _TIER_MAP = {t['name'].lower(): t for t in PRICING_TIERS}
 # ── Billing home ─────────────────────────────────────────────────────────────
 
 @login_required
+def stripe_config(request):
+    """Return Stripe publishable key as JSON — avoids template caching issues."""
+    return JsonResponse({'publishable_key': settings.STRIPE_PUBLISHABLE_KEY})
+
+
+@login_required
 def billing_home(request):
     recent_payments = Payment.objects.filter(user=request.user).order_by('-created_at')[:10]
     return render(request, 'billing/home.html', {

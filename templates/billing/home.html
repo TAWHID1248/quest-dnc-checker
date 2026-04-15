@@ -77,8 +77,8 @@
         data-tier="{{ tier.name }}"
         data-price="{{ tier.price }}"
         data-credits="{{ tier.credits_display }}"
-        data-bs-toggle="modal"
-        data-bs-target="#purchaseModal"
+        onclick="openPurchaseModal(this)"
+        type="button"
       >
         Purchase — ${{ tier.price }}
       </button>
@@ -212,171 +212,170 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Stripe.js -->
 <script src="https://js.stripe.com/v3/"></script>
-
 <script>
-(function () {
-  'use strict';
+  var STRIPE_CONFIG_URL = '{% url "billing:stripe_config" %}';
+  var CREATE_PI_URL     = '{% url "billing:create_payment_intent" %}';
+  var CSRF_TOKEN        = '{{ csrf_token }}';
+  var stripeObj         = null;
+  var cardElement       = null;
+  var currentTier       = null;
 
-  const PUBLISHABLE_KEY = '{{ stripe_pk }}';
-  const CREATE_PI_URL   = '{% url "billing:create_payment_intent" %}';
-  const CSRF_TOKEN      = '{{ csrf_token }}';
-
-  let stripe, cardElement, currentTier = null;
-
-  // ── Bootstrap modal events ────────────────────────────────────────────────
-  const modalEl = document.getElementById('purchaseModal');
-
-  modalEl.addEventListener('show.bs.modal', e => {
-    const btn = e.relatedTarget;
-    if (!btn) return;
-
+  /* ── Open modal (pure JS, no Bootstrap.Modal dependency) ── */
+  function openPurchaseModal(btn) {
     currentTier = {
-      name:    btn.dataset.tier,
-      price:   btn.dataset.price,
-      credits: btn.dataset.credits,
+      name:    btn.getAttribute('data-tier'),
+      price:   btn.getAttribute('data-price'),
+      credits: btn.getAttribute('data-credits'),
     };
 
-    // Populate order summary
     document.getElementById('modal-tier-name').textContent = currentTier.name + ' Plan';
     document.getElementById('modal-credits').textContent   = currentTier.credits;
     document.getElementById('modal-price').textContent     = '$' + currentTier.price;
     document.getElementById('pay-btn-amount').textContent  = '$' + currentTier.price;
-
-    // Reset to form state
-    showState('form');
     document.getElementById('payment-error-msg').textContent = '';
+    document.getElementById('pay-btn').disabled = false;
+    showState('form');
 
-    // Mount Stripe card element
-    if (!stripe) {
-      if (!PUBLISHABLE_KEY || PUBLISHABLE_KEY.startsWith('pk_test_...')) {
-        document.getElementById('card-element').innerHTML =
-          '<div style="color:#d29922;font-size:.82rem;padding:.5rem 0;">' +
-          '<i class="bi bi-exclamation-triangle me-1"></i>' +
-          'Add your Stripe publishable key to .env to enable payments.</div>';
-        document.getElementById('pay-btn').disabled = true;
-        return;
-      }
-      stripe = Stripe(PUBLISHABLE_KEY);
+    /* show the modal div manually */
+    var m = document.getElementById('purchaseModal');
+    m.style.display = 'block';
+    setTimeout(function(){ m.classList.add('show'); }, 10);
+    document.body.classList.add('modal-open');
+    document.body.style.overflow = 'hidden';
+
+    /* backdrop */
+    var bd = document.getElementById('modalBackdrop');
+    if (!bd) {
+      bd = document.createElement('div');
+      bd.id = 'modalBackdrop';
+      bd.className = 'modal-backdrop fade';
+      document.body.appendChild(bd);
     }
+    setTimeout(function(){ bd.classList.add('show'); }, 10);
 
-    // Destroy previous element if exists
-    if (cardElement) { cardElement.destroy(); }
+    mountCard();
+  }
 
-    const elements = stripe.elements({
-      appearance: {
-        theme: 'night',
-        variables: {
-          colorPrimary:    '#3b82f6',
-          colorBackground: '#161b22',
-          colorText:       '#e6edf3',
-          colorDanger:     '#f85149',
-          fontFamily:      '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-          borderRadius:    '8px',
-        },
-      },
-    });
-
-    cardElement = elements.create('card', {
-      style: {
-        base: {
-          color:           '#e6edf3',
-          fontSize:        '15px',
-          fontFamily:      '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-          '::placeholder': { color: '#6e7681' },
-        },
-        invalid: { color: '#f85149' },
-      },
-      hidePostalCode: false,
-    });
-
-    cardElement.mount('#card-element');
-
-    cardElement.on('change', e => {
-      document.getElementById('payment-error-msg').textContent =
-        e.error ? e.error.message : '';
-    });
-  });
-
-  // Clean up on close
-  modalEl.addEventListener('hidden.bs.modal', () => {
+  function closePurchaseModal() {
+    var m  = document.getElementById('purchaseModal');
+    var bd = document.getElementById('modalBackdrop');
+    m.classList.remove('show');
+    if (bd) bd.classList.remove('show');
+    setTimeout(function(){
+      m.style.display = 'none';
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      if (bd) bd.remove();
+    }, 200);
     if (cardElement) { cardElement.destroy(); cardElement = null; }
-  });
+    stripeObj = null;
+  }
 
-  // ── Pay button ────────────────────────────────────────────────────────────
-  document.getElementById('pay-btn').addEventListener('click', async () => {
-    if (!stripe || !cardElement || !currentTier) return;
+  /* ── Mount Stripe card element (fetches PK live from server) ── */
+  function mountCard() {
+    var el = document.getElementById('card-element');
+    el.innerHTML = '<div style="color:#6e7681;font-size:.82rem;padding:.5rem 0;">Loading card form…</div>';
 
-    setPayBtnLoading(true);
-    document.getElementById('payment-error-msg').textContent = '';
-
-    try {
-      // 1. Create PaymentIntent on the server
-      const piRes = await fetch(CREATE_PI_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken':  CSRF_TOKEN,
-        },
-        body: JSON.stringify({ tier: currentTier.name }),
-      });
-
-      const piData = await piRes.json();
-      if (!piRes.ok || piData.error) {
-        throw new Error(piData.error || 'Failed to initialise payment.');
-      }
-
-      // 2. Confirm card payment with Stripe.js
-      showState('processing');
-
-      const { paymentIntent, error } = await stripe.confirmCardPayment(
-        piData.client_secret,
-        { payment_method: { card: cardElement } },
-      );
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (paymentIntent.status === 'succeeded') {
-        showState('success');
-        document.getElementById('success-msg').textContent =
-          currentTier.credits + ' credits will appear in your balance shortly.';
-      } else {
-        throw new Error('Payment did not complete. Status: ' + paymentIntent.status);
-      }
-
-    } catch (err) {
-      showState('error');
-      document.getElementById('error-detail').textContent = err.message;
-      setPayBtnLoading(false);
+    if (typeof Stripe !== 'function') {
+      return showCardError('Stripe.js could not load. Check your internet connection and refresh.');
     }
-  });
 
-  // Retry button
-  document.getElementById('retry-btn').addEventListener('click', () => {
-    showState('form');
-    setPayBtnLoading(false);
-  });
+    fetch(STRIPE_CONFIG_URL)
+      .then(function(r) { return r.json(); })
+      .then(function(cfg) {
+        var pk = cfg.publishable_key;
+        if (!pk || !pk.startsWith('pk_')) {
+          return showCardError('Stripe key not configured on the server.');
+        }
+        try {
+          stripeObj    = Stripe(pk);
+          var elements = stripeObj.elements();
+          cardElement  = elements.create('card', {
+            style: {
+              base: {
+                color: '#e6edf3', fontSize: '15px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+                '::placeholder': { color: '#6e7681' },
+                iconColor: '#6e7681',
+              },
+              invalid: { color: '#f85149', iconColor: '#f85149' },
+            },
+            hidePostalCode: true,
+          });
+          el.innerHTML = '';
+          cardElement.mount('#card-element');
+          cardElement.on('change', function(e) {
+            document.getElementById('payment-error-msg').textContent = e.error ? e.error.message : '';
+          });
+        } catch(err) {
+          showCardError('Card form error: ' + err.message);
+        }
+      })
+      .catch(function(err) {
+        showCardError('Could not reach server: ' + err.message);
+      });
+  }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function showState(name) {
-    ['form', 'processing', 'success', 'error'].forEach(s => {
-      const el = document.getElementById('state-' + s);
-      el.classList.toggle('active', s === name);
+  /* ── Pay button ── */
+  document.addEventListener('DOMContentLoaded', function() {
+
+    document.getElementById('pay-btn').addEventListener('click', async function() {
+      if (!stripeObj || !cardElement || !currentTier) return;
+      setPayBtnLoading(true);
+      document.getElementById('payment-error-msg').textContent = '';
+      try {
+        var res  = await fetch(CREATE_PI_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ tier: currentTier.name }),
+        });
+        var data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Server error HTTP ' + res.status);
+
+        showState('processing');
+        var result = await stripeObj.confirmCardPayment(data.client_secret, {
+          payment_method: { card: cardElement },
+        });
+        if (result.error) throw new Error(result.error.message);
+        if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+          showState('success');
+          document.getElementById('success-msg').textContent =
+            currentTier.credits + ' credits will appear in your balance shortly.';
+        } else {
+          throw new Error('Unexpected status: ' + (result.paymentIntent ? result.paymentIntent.status : '?'));
+        }
+      } catch(err) {
+        showState('error');
+        document.getElementById('error-detail').textContent = err.message;
+        setPayBtnLoading(false);
+      }
     });
-    // Only allow closing modal when not mid-payment
-    const closeBtn = document.getElementById('modal-close-btn');
-    closeBtn.style.display = name === 'processing' ? 'none' : '';
-  }
 
-  function setPayBtnLoading(loading) {
-    const btn = document.getElementById('pay-btn');
-    btn.classList.toggle('loading', loading);
-    btn.disabled = loading;
-  }
+    document.getElementById('retry-btn').addEventListener('click', function() {
+      showState('form'); setPayBtnLoading(false);
+    });
 
-})();
+    document.getElementById('modal-close-btn').addEventListener('click', closePurchaseModal);
+  });
+
+  /* ── Helpers ── */
+  function showState(name) {
+    ['form','processing','success','error'].forEach(function(s) {
+      document.getElementById('state-' + s).classList.toggle('active', s === name);
+    });
+    document.getElementById('modal-close-btn').style.display = name === 'processing' ? 'none' : '';
+  }
+  function setPayBtnLoading(on) {
+    var b = document.getElementById('pay-btn');
+    b.classList.toggle('loading', on);
+    b.disabled = on;
+  }
+  function showCardError(msg) {
+    document.getElementById('card-element').innerHTML =
+      '<div style="color:#f85149;font-size:.82rem;padding:.5rem 0;">' +
+      '<i class="bi bi-exclamation-triangle me-1"></i>' + msg + '</div>';
+    document.getElementById('pay-btn').disabled = true;
+  }
 </script>
 {% endblock %}

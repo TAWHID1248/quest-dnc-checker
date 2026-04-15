@@ -88,6 +88,39 @@ def _build_result_csv(clean_numbers: list[str]) -> bytes:
     return ('\ufeff' + buf.getvalue()).encode('utf-8')
 
 
+def _send_completion_email(job: ScrubJob) -> None:
+    """Email the job owner when their scrub completes."""
+    from django.conf import settings as django_settings
+    from django.core.mail import send_mail
+
+    user = job.user
+    clean_rate = round((job.clean / job.total * 100), 1) if job.total else 0
+    subject = f"DNC Scrub Complete — {job.job_id}"
+    body = (
+        f"Hello {user.display_name},\n\n"
+        f"Your DNC scrub job {job.job_id} has completed successfully.\n\n"
+        f"Results Summary\n"
+        f"---------------\n"
+        f"  File:           {job.filename}\n"
+        f"  Total numbers:  {job.total:,}\n"
+        f"  Clean:          {job.clean:,} ({clean_rate}%)\n"
+        f"  Federal DNC:    {job.dnc:,}\n"
+        f"  State DNC:      {job.state_dnc:,}\n"
+        f"  Litigators:     {job.litigator:,}\n\n"
+        f"Log in to download your clean list:\n"
+        f"https://questdnc.com/scrubber/\n\n"
+        f"— The Quest DNC Team"
+    )
+    send_mail(
+        subject,
+        body,
+        django_settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=True,
+    )
+    logger.info("Sent completion email for job %s to %s", job.job_id, user.email)
+
+
 def _deduct_credits(job: ScrubJob, amount: int) -> None:
     """
     Atomically deduct `amount` credits from the job owner's balance and
@@ -130,29 +163,23 @@ class NoValidNumbersError(Exception):
 
 # ── Main task ────────────────────────────────────────────────────────────────
 
-@shared_task(
-    bind=True,
-    name='scrubber.tasks.process_scrub_job',
-    max_retries=0,           # no retries — see module docstring
-    acks_late=True,          # ack only after the task completes
-    reject_on_worker_lost=True,
-    time_limit=3600,         # hard 1-hour cap
-    soft_time_limit=3300,    # soft cap: allows cleanup before hard kill
-)
-def process_scrub_job(self, job_id: int) -> dict:
+def run_scrub_job(job_id: int) -> dict:
     """
-    Process a ScrubJob identified by its PK.
+    Core scrub pipeline — runs entirely synchronously without Celery.
+
+    Called by the Celery task wrapper below, and also directly (in a thread)
+    when the Celery broker is unavailable (e.g. local dev without Redis).
 
     Args:
         job_id: ScrubJob primary key (integer, NOT job_id string).
 
     Returns:
-        Summary dict with final counts (used by Celery result backend).
+        Summary dict with final counts.
     """
     try:
         job = ScrubJob.objects.select_related('user').get(pk=job_id)
     except ScrubJob.DoesNotExist:
-        logger.error("process_scrub_job called with unknown job_id=%s", job_id)
+        logger.error("run_scrub_job called with unknown job_id=%s", job_id)
         raise
 
     logger.info("Starting scrub job %s for user %s", job.job_id, job.user_id)
@@ -258,6 +285,12 @@ def process_scrub_job(self, job_id: int) -> dict:
         # Done LAST: if anything above failed we don't charge the user.
         _deduct_credits(job, total)
 
+        # ── 8. Send completion email ─────────────────────────────────────
+        try:
+            _send_completion_email(job)
+        except Exception:
+            logger.exception("Failed to send completion email for job %s", job.job_id)
+
     return {
         'job_id':    job.job_id,
         'status':    job.status,
@@ -267,3 +300,17 @@ def process_scrub_job(self, job_id: int) -> dict:
         'litigator': job.litigator,
         'state_dnc': job.state_dnc,
     }
+
+
+@shared_task(
+    bind=True,
+    name='scrubber.tasks.process_scrub_job',
+    max_retries=0,           # no retries — see module docstring
+    acks_late=True,          # ack only after the task completes
+    reject_on_worker_lost=True,
+    time_limit=3600,         # hard 1-hour cap
+    soft_time_limit=3300,    # soft cap: allows cleanup before hard kill
+)
+def process_scrub_job(self, job_id: int) -> dict:
+    """Celery task wrapper — delegates to run_scrub_job()."""
+    return run_scrub_job(job_id)

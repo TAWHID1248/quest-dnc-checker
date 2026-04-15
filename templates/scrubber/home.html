@@ -67,15 +67,86 @@
     margin-top: .75rem;
   }
   .file-info.show { display: flex; }
+
+  /* Progress bar section */
+  #uploadProgress {
+    margin-top: 1rem;
+  }
+  #uploadProgress .progress {
+    height: 8px;
+    background: #21262d;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #uploadProgress .progress-bar {
+    background: var(--accent, #3b82f6);
+    transition: width 0.2s ease;
+    border-radius: 4px;
+  }
+  #uploadProgress .progress-label {
+    font-size: .78rem;
+    color: #8b949e;
+    margin-bottom: .4rem;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Status badges */
   .status-badge { font-size:.75rem; padding:.25rem .65rem; border-radius:20px; font-weight:600; }
-  .status-completed { background:#1a3a2a; color:#3fb950; }
+  .status-completed  { background:#1a3a2a; color:#3fb950; }
   .status-processing { background:#1a2a3a; color:#3b82f6; }
   .status-failed     { background:#3a1a1a; color:#f85149; }
   .status-pending, .status-queued { background:#2a2a1a; color:#d29922; }
+
+  /* Live spinner for active rows */
+  .row-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid #3b82f6;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast container */
+  #toastContainer {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+  .live-toast {
+    min-width: 280px;
+    max-width: 360px;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: .9rem 1.1rem;
+    font-size: .85rem;
+    color: #e6edf3;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    animation: slideUp .25s ease;
+  }
+  .live-toast.toast-success { border-left: 3px solid #3fb950; }
+  .live-toast.toast-error   { border-left: 3px solid #f85149; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
 <div class="row g-4">
 
   <!-- ── Upload panel ──────────────────────────── -->
@@ -85,7 +156,7 @@
         <h6 class="mb-0 fw-semibold"><i class="bi bi-upload me-2 text-primary"></i>New Scrub Job</h6>
       </div>
       <div class="card-body p-4">
-        <form method="post" enctype="multipart/form-data" id="scrubForm">
+        <form id="scrubForm" enctype="multipart/form-data">
           {% csrf_token %}
 
           <!-- Scrub type selection -->
@@ -174,6 +245,20 @@
           <button type="submit" class="btn btn-primary w-100 fw-semibold" id="submitBtn" disabled>
             <i class="bi bi-play-fill me-1"></i>Start Scrub Job
           </button>
+
+          <!-- Upload progress (hidden until upload starts) -->
+          <div id="uploadProgress" class="d-none">
+            <div class="progress-label">
+              <span id="progressLabel">Uploading...</span>
+              <span id="progressPct">0%</span>
+            </div>
+            <div class="progress">
+              <div id="progressBar" class="progress-bar" role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+          </div>
+
+          <!-- Upload error (hidden until error) -->
+          <div id="uploadError" class="alert alert-danger mt-3 d-none" role="alert"></div>
         </form>
       </div>
     </div>
@@ -263,7 +348,7 @@
 <div class="card mt-4">
   <div class="card-header py-3 d-flex justify-content-between align-items-center">
     <h6 class="mb-0 fw-semibold">Previous Scrub Jobs</h6>
-    <span style="font-size:.8rem;color:#6e7681;">{{ recent_jobs|length }} jobs</span>
+    <span id="jobCount" style="font-size:.8rem;color:#6e7681;">{{ recent_jobs|length }} jobs</span>
   </div>
   <div class="table-responsive">
     <table class="table mb-0 align-middle" style="font-size:.85rem;">
@@ -282,9 +367,10 @@
           <th class="text-center">Download</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="jobsTableBody">
         {% for job in recent_jobs %}
-        <tr>
+        <tr id="row-{{ job.job_id }}"
+            {% if job.status in 'pending,queued,processing' %}data-polling="{{ job.job_id }}"{% endif %}>
           <td><span style="color:#3b82f6;font-family:monospace;font-size:.8rem;">{{ job.job_id }}</span></td>
           <td style="max-width:150px;" class="text-truncate" title="{{ job.filename }}">{{ job.filename }}</td>
           <td>
@@ -292,16 +378,17 @@
               <span class="badge bg-dark border" style="font-size:.68rem;border-color:#30363d!important;">{{ t|upper }}</span>
             {% endfor %}
           </td>
-          <td class="text-center">{{ job.total }}</td>
-          <td class="text-center" style="color:#3fb950;">{{ job.clean }}</td>
-          <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
-          <td class="text-center" style="color:#f85149;">{{ job.litigator }}</td>
-          <td class="text-center" style="color:#d29922;">{{ job.state_dnc }}</td>
-          <td class="text-center">
+          <td class="text-center job-total">{{ job.total }}</td>
+          <td class="text-center job-clean" style="color:#3fb950;">{{ job.clean }}</td>
+          <td class="text-center job-dnc" style="color:#f85149;">{{ job.dnc }}</td>
+          <td class="text-center job-litigator" style="color:#f85149;">{{ job.litigator }}</td>
+          <td class="text-center job-state" style="color:#d29922;">{{ job.state_dnc }}</td>
+          <td class="text-center job-status-cell">
             <span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span>
+            {% if job.status in 'pending,queued,processing' %}<span class="row-spinner"></span>{% endif %}
           </td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
-          <td class="text-center">
+          <td class="text-center job-download-cell">
             {% if job.result_file and job.status == 'completed' %}
               <a href="{{ job.result_file.url }}" class="btn btn-sm btn-outline-success" title="Download results">
                 <i class="bi bi-download"></i>
@@ -312,7 +399,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr>
+        <tr id="emptyRow">
           <td colspan="11" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-inbox fs-2 d-block mb-2"></i>
             No scrub jobs yet. Upload a file above to get started.
@@ -327,6 +414,7 @@
 
 {% block extra_js %}
 <script>
+// ── File drag & drop ──────────────────────────────────────────────────
 const dropZone   = document.getElementById('dropZone');
 const fileInput  = document.getElementById('fileInput');
 const fileInfo   = document.getElementById('fileInfo');
@@ -338,8 +426,8 @@ const creditEst  = document.getElementById('creditEst');
 
 function formatBytes(b) {
   if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
-  return (b/1048576).toFixed(1) + ' MB';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
 }
 
 function showFile(file) {
@@ -347,7 +435,6 @@ function showFile(file) {
   fileSizeEl.textContent = formatBytes(file.size);
   fileInfo.classList.add('show');
   submitBtn.disabled = false;
-  // Rough line estimate: avg 12 bytes/number
   const est = Math.round(file.size / 12);
   lineEst.textContent = est.toLocaleString();
   creditEst.textContent = est.toLocaleString() + ' credits';
@@ -361,12 +448,9 @@ function clearFile() {
   creditEst.textContent = '—';
 }
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) showFile(fileInput.files[0]);
-});
-
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) showFile(fileInput.files[0]); });
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
@@ -379,5 +463,209 @@ dropZone.addEventListener('drop', e => {
   }
 });
 dropZone.addEventListener('click', () => fileInput.click());
+
+// ── AJAX upload with progress bar ─────────────────────────────────────
+const scrubForm     = document.getElementById('scrubForm');
+const uploadProgress = document.getElementById('uploadProgress');
+const progressBar   = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+const progressPct   = document.getElementById('progressPct');
+const uploadError   = document.getElementById('uploadError');
+
+function setProgress(pct, label) {
+  progressBar.style.width = pct + '%';
+  progressBar.setAttribute('aria-valuenow', pct);
+  progressPct.textContent = pct + '%';
+  if (label) progressLabel.textContent = label;
+}
+
+function showUploadError(msg) {
+  uploadError.textContent = msg;
+  uploadError.classList.remove('d-none');
+  uploadProgress.classList.add('d-none');
+  submitBtn.disabled = false;
+}
+
+scrubForm.addEventListener('submit', function(e) {
+  e.preventDefault();
+  uploadError.classList.add('d-none');
+  uploadProgress.classList.remove('d-none');
+  submitBtn.disabled = true;
+  setProgress(0, 'Uploading...');
+
+  const formData = new FormData(this);
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.addEventListener('progress', function(e) {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      setProgress(pct, 'Uploading...');
+    }
+  });
+
+  xhr.addEventListener('load', function() {
+    let data;
+    try { data = JSON.parse(xhr.responseText); } catch(err) {
+      showUploadError('Unexpected server response. Please try again.');
+      return;
+    }
+    if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+      setProgress(100, 'Queued — processing...');
+      // Reset the form for the next upload
+      clearFile();
+      scrubForm.reset();
+      setTimeout(() => { uploadProgress.classList.add('d-none'); submitBtn.disabled = true; }, 1500);
+      // Insert a new row into the jobs table and start polling
+      insertJobRow(data);
+      startPolling(data.job_id);
+    } else {
+      showUploadError(data.error || 'Upload failed. Please try again.');
+    }
+  });
+
+  xhr.addEventListener('error', function() {
+    showUploadError('Network error. Please check your connection and try again.');
+  });
+
+  xhr.open('POST', window.location.pathname);
+  xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+  xhr.send(formData);
+});
+
+// ── Jobs table helpers ────────────────────────────────────────────────
+function insertJobRow(data) {
+  const tbody = document.getElementById('jobsTableBody');
+  // Remove empty-state row if present
+  const emptyRow = document.getElementById('emptyRow');
+  if (emptyRow) emptyRow.remove();
+
+  const typeBadges = (data.scrub_types || [])
+    .map(t => `<span class="badge bg-dark border" style="font-size:.68rem;border-color:#30363d!important;">${t.toUpperCase()}</span>`)
+    .join(' ');
+
+  const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const tr = document.createElement('tr');
+  tr.id = `row-${data.job_id}`;
+  tr.setAttribute('data-polling', data.job_id);
+  tr.innerHTML = `
+    <td><span style="color:#3b82f6;font-family:monospace;font-size:.8rem;">${data.job_id}</span></td>
+    <td style="max-width:150px;" class="text-truncate" title="${data.filename}">${data.filename}</td>
+    <td>${typeBadges}</td>
+    <td class="text-center job-total">—</td>
+    <td class="text-center job-clean" style="color:#3fb950;">—</td>
+    <td class="text-center job-dnc" style="color:#f85149;">—</td>
+    <td class="text-center job-litigator" style="color:#f85149;">—</td>
+    <td class="text-center job-state" style="color:#d29922;">—</td>
+    <td class="text-center job-status-cell">
+      <span class="status-badge status-queued">Queued</span>
+      <span class="row-spinner"></span>
+    </td>
+    <td class="text-end" style="color:#6e7681;white-space:nowrap;">${today}</td>
+    <td class="text-center job-download-cell">
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
+    </td>
+  `;
+  tbody.insertBefore(tr, tbody.firstChild);
+
+  // Update job count badge
+  const countEl = document.getElementById('jobCount');
+  if (countEl) {
+    const current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = (current + 1) + ' jobs';
+  }
+}
+
+function updateJobRow(data) {
+  const row = document.getElementById(`row-${data.job_id}`);
+  if (!row) return;
+
+  row.querySelector('.job-total').textContent = data.total ? data.total.toLocaleString() : '—';
+  row.querySelector('.job-clean').textContent = data.clean ? data.clean.toLocaleString() : '—';
+  row.querySelector('.job-dnc').textContent   = data.dnc   ? data.dnc.toLocaleString()   : '—';
+  row.querySelector('.job-litigator').textContent = data.litigator ? data.litigator.toLocaleString() : '—';
+  row.querySelector('.job-state').textContent = data.state_dnc ? data.state_dnc.toLocaleString() : '—';
+
+  const statusCell = row.querySelector('.job-status-cell');
+  const spinner = statusCell.querySelector('.row-spinner');
+  const badge = statusCell.querySelector('.status-badge');
+  badge.className = `status-badge status-${data.status}`;
+  badge.textContent = data.status_display;
+
+  const terminal = ['completed', 'failed', 'cancelled'];
+  if (terminal.includes(data.status)) {
+    if (spinner) spinner.remove();
+    row.removeAttribute('data-polling');
+
+    const dlCell = row.querySelector('.job-download-cell');
+    if (data.status === 'completed' && data.result_url) {
+      dlCell.innerHTML = `<a href="${data.result_url}" class="btn btn-sm btn-outline-success" title="Download results"><i class="bi bi-download"></i></a>`;
+    }
+  }
+}
+
+// ── Real-time polling ─────────────────────────────────────────────────
+const pollingIntervals = new Map(); // job_id -> intervalId
+
+function startPolling(jobId) {
+  if (pollingIntervals.has(jobId)) return;
+  // Poll immediately, then every 3 seconds
+  pollJob(jobId);
+  const id = setInterval(() => pollJob(jobId), 3000);
+  pollingIntervals.set(jobId, id);
+}
+
+function stopPolling(jobId) {
+  if (pollingIntervals.has(jobId)) {
+    clearInterval(pollingIntervals.get(jobId));
+    pollingIntervals.delete(jobId);
+  }
+}
+
+function pollJob(jobId) {
+  fetch(`/scrubber/status/${jobId}/`)
+    .then(r => r.json())
+    .then(data => {
+      updateJobRow(data);
+      const terminal = ['completed', 'failed', 'cancelled'];
+      if (terminal.includes(data.status)) {
+        stopPolling(jobId);
+        if (data.status === 'completed') {
+          showToast(
+            `<i class="bi bi-check-circle-fill text-success me-2"></i>`
+            + `Job <strong>${jobId}</strong> complete — `
+            + `${(data.clean || 0).toLocaleString()} clean numbers ready.`,
+            'success'
+          );
+        } else if (data.status === 'failed') {
+          showToast(
+            `<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>`
+            + `Job <strong>${jobId}</strong> failed. ${data.error_message || ''}`,
+            'error'
+          );
+        }
+      }
+    })
+    .catch(() => { /* network error — keep polling */ });
+}
+
+// ── Toast notifications ───────────────────────────────────────────────
+function showToast(html, type = 'success') {
+  const container = document.getElementById('toastContainer');
+  const div = document.createElement('div');
+  div.className = `live-toast toast-${type}`;
+  div.innerHTML = html;
+  container.appendChild(div);
+  setTimeout(() => {
+    div.style.transition = 'opacity .4s';
+    div.style.opacity = '0';
+    setTimeout(() => div.remove(), 400);
+  }, 6000);
+}
+
+// ── Start polling for any active jobs already in the table ────────────
+document.querySelectorAll('[data-polling]').forEach(row => {
+  startPolling(row.getAttribute('data-polling'));
+});
 </script>
 {% endblock %}

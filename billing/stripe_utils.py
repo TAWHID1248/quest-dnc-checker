@@ -67,7 +67,7 @@ def create_payment_intent(
         amount=amount_usd * 100,          # Stripe works in cents
         currency='usd',
         customer=customer_id,
-        automatic_payment_methods={'enabled': True},
+        payment_method_types=['card'],    # Card Element only — no redirect methods
         metadata={
             'user_id':   str(user_id),
             'tier_name': tier_name,
@@ -85,7 +85,7 @@ def create_setup_intent(customer_id: str) -> stripe.SetupIntent:
     """
     return stripe.SetupIntent.create(
         customer=customer_id,
-        automatic_payment_methods={'enabled': True},
+        payment_method_types=['card'],    # Card Element only
         metadata={'save_card': 'true'},
     )
 

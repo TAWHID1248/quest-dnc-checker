@@ -63,17 +63,33 @@ def iter_numbers(file_obj, encoding: str = 'utf-8') -> Iterator[tuple[int, str, 
         if not line:
             continue
 
-        # Take first comma-separated token (handles CSV with headers / extra cols)
-        raw = line.split(',')[0].strip().strip('"').strip("'")
+        tokens = [t.strip().strip('"').strip("'") for t in line.split(',')]
 
-        if not raw:
+        # Skip rows where every token is alphabetic (header rows)
+        if all(re.match(r'^[a-zA-Z_\s]+$', t) for t in tokens if t):
             continue
 
-        # Skip obvious header rows
-        if re.match(r'^[a-zA-Z]', raw) and not re.search(r'\d', raw):
+        # Try tokens in order; use the first one that normalises to a valid number.
+        # This handles CSVs where the phone column is not the first column.
+        best_raw = tokens[0] if tokens else ''
+        best_norm = None
+        for token in tokens:
+            if not token:
+                continue
+            # Skip tokens that are obviously not phone numbers (long strings, non-digits heavy)
+            digit_count = sum(c.isdigit() for c in token)
+            if digit_count < 7:
+                continue
+            norm = normalize(token)
+            if norm is not None:
+                best_raw = token
+                best_norm = norm
+                break
+
+        if not best_raw:
             continue
 
-        yield lineno, raw, normalize(raw)
+        yield lineno, best_raw, best_norm
 
 
 def extract_unique_numbers(file_obj) -> tuple[list[str], int, int]:

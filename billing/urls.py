@@ -5,6 +5,7 @@ app_name = 'billing'
 
 urlpatterns = [
     path('', views.billing_home, name='home'),
+    path('config/', views.stripe_config, name='stripe_config'),
 
     # Stripe AJAX endpoints
     path('create-payment-intent/', views.create_payment_intent_view, name='create_payment_intent'),

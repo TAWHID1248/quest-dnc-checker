@@ -2,7 +2,8 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import ScrubJob
 
@@ -23,43 +24,63 @@ def scrubber_home(request):
     return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
 
 
+@login_required
+def job_status(request, job_id):
+    """Return JSON status for a scrub job (used by real-time polling)."""
+    job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
+    return JsonResponse({
+        'job_id': job.job_id,
+        'status': job.status,
+        'status_display': job.get_status_display(),
+        'total': job.total,
+        'clean': job.clean,
+        'dnc': job.dnc,
+        'litigator': job.litigator,
+        'state_dnc': job.state_dnc,
+        'error_message': job.error_message,
+        'result_url': job.result_file.url if job.result_file else None,
+    })
+
+
 def _handle_upload(request, recent_jobs):
     """Validate the upload, create a ScrubJob, and dispatch the Celery task."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def _error(msg, status=400):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': msg}, status=status)
+        messages.error(request, msg)
+        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
+
     # ── Validate scrub types ─────────────────────────────────────────────
     selected_types = request.POST.getlist('scrub_types')
     selected_types = [t for t in selected_types if t in _VALID_SCRUB_TYPES]
 
     if not selected_types:
-        messages.error(request, 'Please select at least one scrub type.')
-        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
+        return _error('Please select at least one scrub type.')
 
     # ── Validate file ────────────────────────────────────────────────────
     uploaded = request.FILES.get('file')
 
     if not uploaded:
-        messages.error(request, 'Please upload a file.')
-        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
+        return _error('Please upload a file.')
 
     ext = '.' + uploaded.name.rsplit('.', 1)[-1].lower() if '.' in uploaded.name else ''
     if ext not in _ALLOWED_EXTENSIONS:
-        messages.error(request, 'Only .csv and .txt files are accepted.')
-        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
+        return _error('Only .csv and .txt files are accepted.')
 
     if uploaded.size > _MAX_FILE_SIZE:
-        messages.error(request, f'File too large. Maximum size is {_MAX_FILE_SIZE // 1024 // 1024} MB.')
-        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
+        return _error(f'File too large. Maximum size is {_MAX_FILE_SIZE // 1024 // 1024} MB.')
 
     # ── Credit quick-check (non-atomic, just for fast feedback) ──────────
     # The task performs an atomic check with SELECT FOR UPDATE before
     # actually deducting — this check is just to avoid queuing obviously
     # doomed jobs.
     if request.user.credits <= 0:
-        messages.error(
-            request,
+        return _error(
             'You have no credits remaining. '
-            '<a href="/billing/" class="alert-link">Buy credits</a> to continue.',
+            '<a href="/billing/" class="alert-link">Buy credits</a> to continue.'
         )
-        return render(request, 'scrubber/home.html', {'recent_jobs': recent_jobs})
 
     # ── Create job record ────────────────────────────────────────────────
     job = ScrubJob.objects.create(
@@ -74,25 +95,36 @@ def _handle_upload(request, recent_jobs):
         job.job_id, request.user.email, uploaded.name, selected_types,
     )
 
-    # ── Dispatch Celery task ─────────────────────────────────────────────
+    # ── Dispatch Celery task (with thread fallback if broker is down) ────
     try:
         from .tasks import process_scrub_job
         process_scrub_job.delay(job.pk)
-        messages.success(
-            request,
-            f'Job <strong>{job.job_id}</strong> has been queued. '
-            'Results will appear below once processing is complete.',
+        logger.info("ScrubJob %s dispatched to Celery", job.job_id)
+    except Exception as celery_exc:
+        # Celery broker unavailable — run synchronously in a daemon thread so
+        # the HTTP response returns immediately and the frontend can poll.
+        logger.warning(
+            "Celery unavailable (%s) — running ScrubJob %s in-process thread",
+            celery_exc, job.job_id,
         )
-    except Exception as exc:
-        # Celery broker might be unavailable — mark the job failed immediately
-        logger.exception("Failed to enqueue ScrubJob %s: %s", job.job_id, exc)
-        job.status = ScrubJob.Status.FAILED
-        job.error_message = f'Could not queue task: {exc}'
-        job.save(update_fields=['status', 'error_message'])
-        messages.error(
-            request,
-            'The processing queue is currently unavailable. '
-            'Please try again in a few minutes.',
-        )
+        import threading
+        from .tasks import run_scrub_job
 
+        t = threading.Thread(target=run_scrub_job, args=(job.pk,), daemon=True)
+        t.start()
+
+    if is_ajax:
+        return JsonResponse({
+            'ok': True,
+            'job_id': job.job_id,
+            'job_pk': job.pk,
+            'filename': job.filename,
+            'scrub_types': job.scrub_types,
+            'message': f'Job {job.job_id} has been queued.',
+        })
+    messages.success(
+        request,
+        f'Job <strong>{job.job_id}</strong> has been queued. '
+        'Results will appear below once processing is complete.',
+    )
     return redirect('scrubber:home')

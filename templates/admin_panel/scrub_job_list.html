@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Scrub Jobs — Quest DNC Admin{% endblock %}
+{% block page_title %}Scrub Jobs{% endblock %}
+
+{% block extra_css %}
+<style>
+  .stab {
+    padding:.35rem .9rem; border-radius:20px; font-size:.8rem; font-weight:600;
+    border:1px solid #21262d; color:#6e7681; text-decoration:none; transition:.15s;
+  }
+  .stab:hover { color:#e6edf3; border-color:#30363d; }
+  .stab.active { color:#fff; }
+  .stab-all.active       { background:#21262d; border-color:#30363d; color:#e6edf3; }
+  .stab-pending.active   { background:#2a2a1a; border-color:#d29922; color:#d29922; }
+  .stab-queued.active    { background:#1a2a3a; border-color:#3b82f6; color:#3b82f6; }
+  .stab-processing.active{ background:#1a2a3a; border-color:#3b82f6; color:#3b82f6; }
+  .stab-completed.active { background:#1a3a2a; border-color:#3fb950; color:#3fb950; }
+  .stab-failed.active    { background:#3a1218; border-color:#f85149; color:#f85149; }
+  .count-pill { font-size:.68rem; background:#21262d; border-radius:10px; padding:.1rem .45rem; margin-left:.3rem; }
+  .job-status { font-size:.72rem; padding:.2rem .6rem; border-radius:20px; font-weight:600; }
+  .js-pending    { background:#2a2a1a;color:#d29922; }
+  .js-queued     { background:#1a2a3a;color:#3b82f6; }
+  .js-processing { background:#1a2a3a;color:#3b82f6; }
+  .js-completed  { background:#1a3a2a;color:#3fb950; }
+  .js-failed     { background:#3a1218;color:#f85149; }
+  .js-cancelled  { background:#21262d;color:#6e7681; }
+  .mini-avatar { width:28px;height:28px;border-radius:50%;background:#21262d;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#e6edf3;flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">Scrub Jobs</h4>
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">{{ counts.all }} total job{{ counts.all|pluralize }}</p>
+  </div>
+</div>
+
+<!-- ── Stats row ──────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-label">Total Numbers</div>
+      <div class="stat-value">{{ agg.total_numbers|default:0|floatformat:0 }}</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-label">Total Clean</div>
+      <div class="stat-value" style="color:#3fb950;">{{ agg.total_clean|default:0|floatformat:0 }}</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="stat-card">
+      <div class="stat-label">Total DNC Hits</div>
+      <div class="stat-value" style="color:#f85149;">{{ agg.total_dnc|default:0|floatformat:0 }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Status filter tabs ─────────────── -->
+<div class="d-flex gap-2 flex-wrap mb-3">
+  <a href="?{% if q %}q={{ q }}{% endif %}" class="stab stab-all {% if not status_filter %}active{% endif %}">
+    All <span class="count-pill">{{ counts.all }}</span>
+  </a>
+  <a href="?status=pending{% if q %}&q={{ q }}{% endif %}" class="stab stab-pending {% if status_filter == 'pending' %}active{% endif %}">
+    Pending <span class="count-pill">{{ counts.pending }}</span>
+  </a>
+  <a href="?status=queued{% if q %}&q={{ q }}{% endif %}" class="stab stab-queued {% if status_filter == 'queued' %}active{% endif %}">
+    Queued <span class="count-pill">{{ counts.queued }}</span>
+  </a>
+  <a href="?status=processing{% if q %}&q={{ q }}{% endif %}" class="stab stab-processing {% if status_filter == 'processing' %}active{% endif %}">
+    Processing <span class="count-pill">{{ counts.processing }}</span>
+  </a>
+  <a href="?status=completed{% if q %}&q={{ q }}{% endif %}" class="stab stab-completed {% if status_filter == 'completed' %}active{% endif %}">
+    Completed <span class="count-pill">{{ counts.completed }}</span>
+  </a>
+  <a href="?status=failed{% if q %}&q={{ q }}{% endif %}" class="stab stab-failed {% if status_filter == 'failed' %}active{% endif %}">
+    Failed <span class="count-pill">{{ counts.failed }}</span>
+  </a>
+</div>
+
+<!-- ── Search ─────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="d-flex gap-2 align-items-center">
+      {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+      <div class="flex-grow-1">
+        <div class="input-group">
+          <span class="input-group-text" style="background:#161b22;border-color:#30363d;color:#6e7681;"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search job ID, email or filename…">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+      <a href="{% url 'admin_panel:scrub_job_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </form>
+  </div>
+</div>
+
+<!-- ── Jobs table ─────────────────────── -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.85rem;">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Client</th>
+          <th>Filename</th>
+          <th class="text-center">Status</th>
+          <th class="text-center">Total</th>
+          <th class="text-center">Clean</th>
+          <th class="text-center">DNC</th>
+          <th class="text-center">Litigator</th>
+          <th class="text-end">Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td style="font-family:monospace;font-size:.8rem;color:#3b82f6;">{{ job.job_id }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="mini-avatar">{{ job.user.display_name|first|upper }}</div>
+              <div>
+                <div style="font-size:.82rem;color:#e6edf3;">{{ job.user.display_name|truncatechars:18 }}</div>
+                <div style="font-size:.73rem;color:#6e7681;">{{ job.user.email|truncatechars:22 }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="color:#8b949e;font-size:.82rem;">{{ job.filename|truncatechars:30 }}</td>
+          <td class="text-center"><span class="job-status js-{{ job.status }}">{{ job.get_status_display }}</span></td>
+          <td class="text-center" style="color:#e6edf3;">{{ job.total }}</td>
+          <td class="text-center" style="color:#3fb950;font-weight:600;">{{ job.clean }}</td>
+          <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
+          <td class="text-center" style="color:#d29922;">{{ job.litigator }}</td>
+          <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center py-5" style="color:#6e7681;">
+            <i class="bi bi-funnel fs-2 d-block mb-2"></i>
+            No scrub jobs found{% if q %} matching "{{ q }}"{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

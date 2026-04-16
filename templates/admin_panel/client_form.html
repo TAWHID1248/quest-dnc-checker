@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ form_title }} — Quest DNC Admin{% endblock %}
+{% block page_title %}{{ form_title }}{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">{{ form_title }}</h4>
+    {% if client %}
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">
+      <a href="{% url 'admin_panel:client_detail' client.id %}" style="color:#3b82f6;">← Back to {{ client.email }}</a>
+    </p>
+    {% else %}
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">
+      <a href="{% url 'admin_panel:client_list' %}" style="color:#3b82f6;">← Back to Clients</a>
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-semibold">User Details</h6>
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          {% csrf_token %}
+
+          {% if not client %}
+          <!-- Email — only on create -->
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Email address <span style="color:#f85149;">*</span></label>
+            <input type="email" name="email" value="{{ post.email|default:'' }}"
+                   class="form-control" placeholder="user@example.com" required>
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Full name</label>
+            <input type="text" name="name" value="{{ client.name|default:post.name|default:'' }}"
+                   class="form-control" placeholder="Jane Smith">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Phone</label>
+            <input type="text" name="phone" value="{{ client.phone|default:post.phone|default:'' }}"
+                   class="form-control" placeholder="+1 555 000 0000">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Company</label>
+            <input type="text" name="company" value="{{ client.company|default:post.company|default:'' }}"
+                   class="form-control" placeholder="Acme Corp">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Role</label>
+            <select name="role" class="form-select">
+              <option value="client" {% if client.role == 'client' or not client %}selected{% endif %}>Client</option>
+              <option value="admin"  {% if client.role == 'admin' %}selected{% endif %}>Admin</option>
+            </select>
+          </div>
+
+          {% if client %}
+          <div class="mb-3">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">Status</label>
+            <select name="is_active" class="form-select">
+              <option value="1" {% if client.is_active %}selected{% endif %}>Active</option>
+              <option value="0" {% if not client.is_active %}selected{% endif %}>Inactive</option>
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="mb-4">
+            <label class="form-label" style="color:#8b949e;font-size:.85rem;">
+              Password {% if client %}<span style="color:#6e7681;">(leave blank to keep current)</span>{% else %}<span style="color:#f85149;">*</span>{% endif %}
+            </label>
+            <input type="password" name="password" class="form-control"
+                   placeholder="{% if client %}New password…{% else %}Password{% endif %}"
+                   {% if not client %}required{% endif %}>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              {% if client %}<i class="bi bi-check2 me-1"></i>Save Changes{% else %}<i class="bi bi-person-plus me-1"></i>Create User{% endif %}
+            </button>
+            {% if client %}
+            <a href="{% url 'admin_panel:client_detail' client.id %}" class="btn btn-outline-secondary">Cancel</a>
+            {% else %}
+            <a href="{% url 'admin_panel:client_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

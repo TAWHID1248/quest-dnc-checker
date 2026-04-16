@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Payment Cards — Quest DNC Admin{% endblock %}
+{% block page_title %}Payment Cards{% endblock %}
+
+{% block extra_css %}
+<style>
+  .card-icon { font-size:1.3rem; }
+  .mini-avatar { width:28px;height:28px;border-radius:50%;background:#21262d;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#e6edf3;flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">Payment Cards</h4>
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">{{ total }} stored card{{ total|pluralize }}</p>
+  </div>
+</div>
+
+<!-- ── Search ─────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <div class="flex-grow-1">
+        <div class="input-group">
+          <span class="input-group-text" style="background:#161b22;border-color:#30363d;color:#6e7681;"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search email, last 4 digits or Stripe PM ID…">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Search</button>
+      <a href="{% url 'admin_panel:payment_method_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </form>
+  </div>
+</div>
+
+<!-- ── Cards table ────────────────────── -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle" style="font-size:.85rem;">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Card</th>
+          <th class="text-center">Expires</th>
+          <th class="text-center">Default</th>
+          <th>Stripe PM ID</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in methods %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="mini-avatar">{{ m.user.display_name|first|upper }}</div>
+              <div>
+                <div style="font-size:.82rem;color:#e6edf3;">{{ m.user.display_name|truncatechars:20 }}</div>
+                <div style="font-size:.73rem;color:#6e7681;">{{ m.user.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              {% if m.card_type == 'visa' %}
+                <span class="card-icon" style="color:#1a56db;">Visa</span>
+              {% elif m.card_type == 'mastercard' %}
+                <span class="card-icon" style="color:#eb001b;">MC</span>
+              {% elif m.card_type == 'amex' %}
+                <span class="card-icon" style="color:#2e77bc;">Amex</span>
+              {% else %}
+                <span class="card-icon" style="color:#6e7681;"><i class="bi bi-credit-card"></i></span>
+              {% endif %}
+              <span style="font-family:monospace;letter-spacing:.08em;">•••• {{ m.last4 }}</span>
+            </div>
+          </td>
+          <td class="text-center" style="color:#8b949e;">{{ m.exp_date }}</td>
+          <td class="text-center">
+            {% if m.is_default %}
+              <span class="badge" style="background:#1a3a2a;color:#3fb950;">Default</span>
+            {% else %}
+              <span style="color:#6e7681;">—</span>
+            {% endif %}
+          </td>
+          <td style="font-family:monospace;font-size:.75rem;color:#6e7681;">{{ m.stripe_pm_id }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-5" style="color:#6e7681;">
+            <i class="bi bi-credit-card-2-front fs-2 d-block mb-2"></i>
+            No payment cards found{% if q %} matching "{{ q }}"{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

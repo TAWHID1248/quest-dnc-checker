@@ -14,6 +14,8 @@
   .filter-btn.active-filter { background:#3b82f6!important; border-color:#3b82f6!important; color:#fff!important; }
   tr.client-row { cursor: pointer; transition: background .12s; }
   tr.client-row:hover td { background: rgba(255,255,255,.03); }
+  .credits-preview { font-size:.82rem; color:#6e7681; margin-top:.25rem; }
+  .credits-preview strong { color:#3fb950; }
 </style>
 {% endblock %}
 
@@ -24,6 +26,14 @@
   <div>
     <h4 class="fw-bold mb-1" style="color:#e6edf3;">Client Management</h4>
     <p class="mb-0" style="color:#6e7681;font-size:.875rem;">{{ total }} client{{ total|pluralize }} found</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-warning" onclick="openSendCreditsGlobal()">
+      <i class="bi bi-coin me-1"></i>Send Credits
+    </button>
+    <a href="{% url 'admin_panel:client_create' %}" class="btn btn-sm btn-primary">
+      <i class="bi bi-person-plus me-1"></i>Create User
+    </a>
   </div>
 </div>
 
@@ -99,6 +109,10 @@
               <a href="{% url 'admin_panel:client_detail' c.id %}" class="btn btn-sm btn-outline-secondary" title="View detail">
                 <i class="bi bi-eye"></i>
               </a>
+              <button class="btn btn-sm btn-outline-warning" title="Send credits"
+                onclick="event.stopPropagation(); openSendCredits('{{ c.id }}', '{{ c.email|escapejs }}', '{{ c.display_name|truncatechars:20|escapejs }}', '{{ c.credits }}')">
+                <i class="bi bi-coin"></i>
+              </button>
               <form method="post" action="{% url 'admin_panel:client_toggle' c.id %}" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{% url 'admin_panel:client_list' %}">
@@ -125,4 +139,117 @@
     </table>
   </div>
 </div>
+
+<!-- ── Send Credits Modal ──────────────────────────── -->
+<div class="modal fade" id="sendCreditsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
+      <div class="modal-header" style="border-bottom:1px solid #21262d;">
+        <h5 class="modal-title fw-semibold" style="color:#e6edf3;font-size:.95rem;">
+          <i class="bi bi-coin me-2" style="color:#d29922;"></i>Send Credits
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="" id="sendCreditsForm">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="list">
+        <div class="modal-body p-4">
+
+          <!-- User picker — shown only when opened from header button -->
+          <div id="sendCreditsPickerWrap" class="mb-3" style="display:none;">
+            <label class="form-label" style="font-size:.85rem;color:#8b949e;">Select user</label>
+            <select id="sendCreditsPicker" class="form-select" onchange="onPickerChange(this)">
+              <option value="">— choose a client —</option>
+              {% for c in clients %}
+              <option value="{{ c.id }}"
+                data-email="{{ c.email }}"
+                data-name="{{ c.display_name|truncatechars:30 }}"
+                data-balance="{{ c.credits|floatformat:0 }}">
+                {{ c.display_name }} ({{ c.email }}) — {{ c.credits|floatformat:0 }} credits
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- User info card — shown when a specific user is selected -->
+          <div id="sendCreditsInfo" class="mb-3 p-3 rounded" style="background:#161b22;border:1px solid #21262d;display:none;">
+            <div style="font-size:.82rem;color:#8b949e;">Sending credits to:</div>
+            <div id="sendCreditsName" style="font-weight:600;color:#e6edf3;margin-top:.15rem;"></div>
+            <div id="sendCreditsEmail" style="font-size:.78rem;color:#6e7681;"></div>
+            <div class="mt-1" style="font-size:.82rem;color:#6e7681;">
+              Current balance: <strong id="sendCreditsBalance" style="color:#3fb950;"></strong>
+            </div>
+          </div>
+
+          <label class="form-label" style="font-size:.85rem;color:#8b949e;">
+            Amount <span style="color:#6e7681;font-size:.78rem;">(use negative to deduct)</span>
+          </label>
+          <input type="number" name="amount" id="sendCreditsAmount" class="form-control form-control-lg"
+                 placeholder="e.g. 100000" required>
+          <div class="mt-2 d-flex gap-1 flex-wrap">
+            <span style="font-size:.78rem;color:#6e7681;align-self:center;">Quick:</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAmount(1000)">1K</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAmount(10000)">10K</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAmount(100000)">100K</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAmount(500000)">500K</button>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid #21262d;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-warning text-dark fw-semibold" id="sendCreditsSubmit">
+            <i class="bi bi-coin me-1"></i>Send Credits
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openSendCredits(userId, email, name, balance) {
+  document.getElementById('sendCreditsForm').action = '/panel/clients/' + userId + '/credits/';
+  document.getElementById('sendCreditsName').textContent    = name;
+  document.getElementById('sendCreditsEmail').textContent   = email;
+  document.getElementById('sendCreditsBalance').textContent = parseFloat(balance).toLocaleString() + ' credits';
+  document.getElementById('sendCreditsPickerWrap').style.display = 'none';
+  document.getElementById('sendCreditsInfo').style.display        = 'block';
+  document.getElementById('sendCreditsAmount').value              = '';
+  document.getElementById('sendCreditsSubmit').disabled           = false;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('sendCreditsModal')).show();
+}
+
+function openSendCreditsGlobal() {
+  document.getElementById('sendCreditsForm').action               = '';
+  document.getElementById('sendCreditsPicker').value              = '';
+  document.getElementById('sendCreditsPickerWrap').style.display  = 'block';
+  document.getElementById('sendCreditsInfo').style.display        = 'none';
+  document.getElementById('sendCreditsAmount').value              = '';
+  document.getElementById('sendCreditsSubmit').disabled           = true;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('sendCreditsModal')).show();
+}
+
+document.getElementById('sendCreditsPicker').addEventListener('change', function () {
+  var opt = this.options[this.selectedIndex];
+  if (!opt.value) {
+    document.getElementById('sendCreditsForm').action      = '';
+    document.getElementById('sendCreditsInfo').style.display = 'none';
+    document.getElementById('sendCreditsSubmit').disabled  = true;
+    return;
+  }
+  document.getElementById('sendCreditsForm').action               = '/panel/clients/' + opt.value + '/credits/';
+  document.getElementById('sendCreditsName').textContent          = opt.dataset.name;
+  document.getElementById('sendCreditsEmail').textContent         = opt.dataset.email;
+  document.getElementById('sendCreditsBalance').textContent       = parseFloat(opt.dataset.balance).toLocaleString() + ' credits';
+  document.getElementById('sendCreditsInfo').style.display        = 'block';
+  document.getElementById('sendCreditsSubmit').disabled           = false;
+});
+
+function setAmount(val) {
+  document.getElementById('sendCreditsAmount').value = val;
+  document.getElementById('sendCreditsAmount').focus();
+}
+</script>
 {% endblock %}

@@ -2,8 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-releaseCommand = "mkdir -p static staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput"
-startCommand = "sh -c 'gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
+startCommand = "sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
 healthcheckPath = "/health/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

@@ -58,16 +58,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'quest_dnc.wsgi.application'
 
-# Database — prefer DATABASE_URL (Vercel/Neon), fall back to individual vars
+# Database
 _database_url = config('DATABASE_URL', default='')
 if _database_url:
     DATABASES = {
         'default': dj_database_url.parse(
             _database_url,
-            conn_max_age=600,
-            conn_health_checks=True,
+            conn_max_age=0,
         )
     }
+    DATABASES['default'].setdefault('OPTIONS', {})['connect_timeout'] = 10
 else:
     DATABASES = {
         'default': {
@@ -77,6 +77,7 @@ else:
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='5432'),
+            'OPTIONS': {'connect_timeout': 10},
         }
     }
 

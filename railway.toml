@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
+startCommand = "sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && python manage.py shell -c \"from django.contrib.sites.models import Site; Site.objects.update_or_create(id=1, defaults={\\\"domain\\\": \\\"quest-dnc-checker-production.up.railway.app\\\", \\\"name\\\": \\\"Quest DNC\\\"})\" && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120'"
 healthcheckPath = "/health/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

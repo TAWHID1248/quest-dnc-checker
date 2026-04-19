@@ -108,8 +108,8 @@ def _send_completion_email(job: ScrubJob) -> None:
         f"  State DNC:      {job.state_dnc:,}\n"
         f"  Litigators:     {job.litigator:,}\n\n"
         f"Log in to download your clean list:\n"
-        f"https://questdnc.com/scrubber/\n\n"
-        f"— The Quest DNC Team"
+        f"https://checkdnc.net/scrubber/\n\n"
+        f"— The CheckDNC Team"
     )
     send_mail(
         subject,

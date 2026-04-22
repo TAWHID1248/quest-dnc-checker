@@ -390,7 +390,7 @@
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
           <td class="text-center job-download-cell">
             {% if job.result_file and job.status == 'completed' %}
-              <a href="{{ job.result_file.url }}" class="btn btn-sm btn-outline-success" title="Download results">
+              <a href="{% url 'scrubber:download_result' job.job_id %}" class="btn btn-sm btn-outline-success" title="Download results">
                 <i class="bi bi-download"></i>
               </a>
             {% else %}

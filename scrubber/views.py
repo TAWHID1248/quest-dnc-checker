@@ -1,9 +1,11 @@
 import logging
+import os
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .models import ScrubJob
 
@@ -38,8 +40,22 @@ def job_status(request, job_id):
         'litigator': job.litigator,
         'state_dnc': job.state_dnc,
         'error_message': job.error_message,
-        'result_url': job.result_file.url if job.result_file else None,
+        'result_url': reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,
     })
+
+
+@login_required
+def download_result(request, job_id):
+    """Stream the result CSV to the browser. Enforces ownership."""
+    job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
+    if not job.result_file or job.status != ScrubJob.Status.COMPLETED:
+        raise Http404
+    try:
+        f = job.result_file.open('rb')
+    except (FileNotFoundError, OSError):
+        raise Http404
+    filename = os.path.basename(job.result_file.name)
+    return FileResponse(f, as_attachment=True, filename=filename)
 
 
 def _handle_upload(request, recent_jobs):
@@ -83,13 +99,17 @@ def _handle_upload(request, recent_jobs):
         )
 
     # ── Create job record ────────────────────────────────────────────────
-    job = ScrubJob.objects.create(
-        user=request.user,
-        filename=uploaded.name,
-        file=uploaded,
-        scrub_types=selected_types,
-        status=ScrubJob.Status.QUEUED,
-    )
+    try:
+        job = ScrubJob.objects.create(
+            user=request.user,
+            filename=uploaded.name,
+            file=uploaded,
+            scrub_types=selected_types,
+            status=ScrubJob.Status.QUEUED,
+        )
+    except Exception as exc:
+        logger.exception("Failed to create ScrubJob for user %s: %s", request.user.email, exc)
+        return _error(f'File storage error: {exc}', status=500)
     logger.info(
         "Created ScrubJob %s for user %s (file=%s, types=%s)",
         job.job_id, request.user.email, uploaded.name, selected_types,

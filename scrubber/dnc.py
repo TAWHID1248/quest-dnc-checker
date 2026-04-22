@@ -1,84 +1,45 @@
 """
-DNC checking engine.
+DNC checking engine — real database lookup against dnc_master_numbers.
 
-Each check_* function accepts a list of normalised 10-digit phone numbers and
-returns the subset that matched that list.
+Cross-checks each batch of normalised 10-digit phone numbers against the
+master table using a PostgreSQL TEMP TABLE + JOIN for maximum throughput.
 
-PLACEHOLDER IMPLEMENTATION
---------------------------
-Real implementations will call the FTC / state DNC APIs or compare against a
-locally-cached database snapshot.  The placeholder uses a deterministic hash
-so results are stable across runs (same number always produces the same outcome
-in tests) while still yielding realistic hit-rates for demo purposes.
-
-To swap in a real implementation, replace the body of each check_* function
-without changing its signature.  The task in tasks.py calls this module through
-the single public entry-point  `run_checks()` only.
+If the master table is empty (not yet loaded by admin) all numbers are
+returned as clean and a warning is logged.
 """
 
-import hashlib
+import io
 import logging
 from dataclasses import dataclass, field
 
+from django.db import connection
+
 logger = logging.getLogger(__name__)
 
-
-# ── Hit-rate configuration (placeholder only) ──────────────────────────────
-
-_RATES = {
-    'federal_dnc': 0.14,   # ~14 % of numbers on the federal list
-    'state_dnc':   0.07,   # ~7 % additional state-only hits
-    'litigator':   0.02,   # ~2 % known TCPA litigators
+# list_type string → SMALLINT stored in dnc_master_numbers
+LIST_TYPE_INT = {
+    'federal_dnc': 1,
+    'state_dnc':   2,
+    'litigator':   4,
 }
 
+# SMALLINT → human label used in DNC output CSV
+LIST_INT_LABEL = {
+    1: 'Federal DNC',
+    2: 'State DNC',
+    4: 'Litigator',
+}
 
-def _hash_hit(number: str, salt: str, rate: float) -> bool:
-    """Deterministic pseudo-random hit based on number + salt."""
-    digest = hashlib.md5(f"{salt}:{number}".encode()).hexdigest()
-    # Use first 8 hex chars as a 32-bit unsigned int, compare to rate threshold
-    return int(digest[:8], 16) < int(rate * 0xFFFFFFFF)
-
-
-# ── Individual check functions ──────────────────────────────────────────────
-
-def check_federal_dnc(numbers: list[str]) -> set[str]:
-    """
-    Return the subset of `numbers` found on the Federal Do Not Call Registry.
-
-    Real implementation: query FTC DNC database or a licensed data provider.
-    """
-    return {n for n in numbers if _hash_hit(n, 'federal', _RATES['federal_dnc'])}
-
-
-def check_state_dnc(numbers: list[str]) -> set[str]:
-    """
-    Return the subset of `numbers` found on any state DNC list.
-
-    Real implementation: query per-state registries (varies by state).
-    Numbers already flagged as federal_dnc are excluded here to avoid
-    double-counting in result stats.
-    """
-    return {n for n in numbers if _hash_hit(n, 'state', _RATES['state_dnc'])}
-
-
-def check_litigator(numbers: list[str]) -> set[str]:
-    """
-    Return the subset of `numbers` known to belong to TCPA litigators.
-
-    Real implementation: compare against a licensed litigator database.
-    """
-    return {n for n in numbers if _hash_hit(n, 'litigator', _RATES['litigator'])}
-
-
-# ── Public result container ─────────────────────────────────────────────────
 
 @dataclass
 class BatchResult:
     """Holds categorised results for one batch of numbers."""
-    clean:     list[str] = field(default_factory=list)
-    federal:   set[str]  = field(default_factory=set)
-    state:     set[str]  = field(default_factory=set)
-    litigator: set[str]  = field(default_factory=set)
+    clean:      list = field(default_factory=list)
+    federal:    set  = field(default_factory=set)
+    state:      set  = field(default_factory=set)
+    litigator:  set  = field(default_factory=set)
+    # number (10-digit str) → (human_label, state_str)
+    dnc_details: dict = field(default_factory=dict)
 
     @property
     def dnc_count(self) -> int:
@@ -97,57 +58,100 @@ class BatchResult:
         return len(self.clean)
 
 
-# ── Main entry-point ────────────────────────────────────────────────────────
-
 def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
     """
-    Run all requested checks against `numbers` and return a BatchResult.
+    Cross-check `numbers` against dnc_master_numbers for the requested
+    scrub_types.  Returns a BatchResult with clean + flagged buckets.
 
     Args:
-        numbers:     List of normalised 10-digit phone numbers.
+        numbers:     List of normalised 10-digit phone strings.
         scrub_types: Subset of ['federal_dnc', 'state_dnc', 'litigator'].
-
-    Returns:
-        BatchResult with numbers partitioned into clean / flagged buckets.
-
-    The priority order for categorisation when a number matches multiple
-    lists is: litigator > federal_dnc > state_dnc.  A number is placed in
-    `clean` only if it matches none of the requested lists.
     """
     if not numbers:
         return BatchResult()
 
-    scrub_set = set(scrub_types)
-    flagged: set[str] = set()
+    type_values = [LIST_TYPE_INT[t] for t in scrub_types if t in LIST_TYPE_INT]
+    if not type_values:
+        return BatchResult(clean=list(numbers))
 
-    federal:   set[str] = set()
-    state:     set[str] = set()
-    litigator: set[str] = set()
+    # Map integer → original string so we can reconstruct results
+    int_to_str: dict[int, str] = {}
+    for n in numbers:
+        try:
+            int_to_str[int(n)] = n
+        except (ValueError, TypeError):
+            pass
 
-    # Run only the checks the user requested
-    if 'litigator' in scrub_set:
-        litigator = check_litigator(numbers)
-        flagged |= litigator
-        logger.debug("Litigator check: %d hits out of %d", len(litigator), len(numbers))
+    if not int_to_str:
+        return BatchResult(clean=list(numbers))
 
-    if 'federal_dnc' in scrub_set:
-        # Don't double-flag litigators as federal DNC
-        remaining = [n for n in numbers if n not in flagged]
-        federal = check_federal_dnc(remaining)
-        flagged |= federal
-        logger.debug("Federal DNC check: %d hits out of %d", len(federal), len(remaining))
+    federal:   set = set()
+    state_set: set = set()
+    litigator: set = set()
+    dnc_details: dict = {}
 
-    if 'state_dnc' in scrub_set:
-        remaining = [n for n in numbers if n not in flagged]
-        state = check_state_dnc(remaining)
-        flagged |= state
-        logger.debug("State DNC check: %d hits out of %d", len(state), len(remaining))
+    try:
+        with connection.cursor() as cursor:
+            # Temp table for this batch — dropped at transaction end
+            cursor.execute(
+                "CREATE TEMP TABLE IF NOT EXISTS _scrub_input (number BIGINT)"
+            )
+            cursor.execute("TRUNCATE _scrub_input")
 
-    clean = [n for n in numbers if n not in flagged]
+            # Bulk-load user numbers via COPY
+            buf = io.StringIO()
+            for n in int_to_str:
+                buf.write(f"{n}\n")
+            buf.seek(0)
+            cursor.copy_from(buf, '_scrub_input', columns=('number',))
+
+            # Single JOIN — uses the PRIMARY KEY index on dnc_master_numbers
+            placeholders = ','.join(['%s'] * len(type_values))
+            cursor.execute(
+                f"""
+                SELECT i.number, d.list_type, d.state
+                FROM _scrub_input i
+                JOIN dnc_master_numbers d ON d.number = i.number
+                WHERE d.list_type IN ({placeholders})
+                """,
+                type_values,
+            )
+            rows = cursor.fetchall()
+
+    except Exception as exc:
+        logger.exception("DNC lookup failed, returning all numbers as clean: %s", exc)
+        return BatchResult(clean=list(numbers))
+
+    matched_ints: set = set()
+
+    for number_int, list_type_val, st in rows:
+        n = int_to_str.get(number_int)
+        if n is None:
+            continue
+        matched_ints.add(number_int)
+        label = LIST_INT_LABEL.get(list_type_val, 'DNC')
+        state_str = str(st).strip() if st else ''
+        dnc_details[n] = (label, state_str)
+
+        if list_type_val == 1:
+            federal.add(n)
+        elif list_type_val == 2:
+            state_set.add(n)
+        elif list_type_val == 4:
+            litigator.add(n)
+
+    if not rows:
+        logger.debug(
+            "No DNC matches found for %d numbers (master table may be empty)",
+            len(numbers),
+        )
+
+    clean = [n for n in numbers if int(n) not in matched_ints]
 
     return BatchResult(
         clean=clean,
         federal=federal,
-        state=state,
+        state=state_set,
         litigator=litigator,
+        dnc_details=dnc_details,
     )

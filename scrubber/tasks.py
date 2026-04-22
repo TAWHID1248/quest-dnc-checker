@@ -7,24 +7,21 @@ Pipeline
 2.  Open uploaded file from Django storage
 3.  Parse & normalise all phone numbers (deduped)
 4.  Credit pre-flight check (atomic, with row-lock)
-5.  Process in batches of BATCH_SIZE through the DNC engine
-6.  Write clean-numbers and DNC-numbers result CSVs to Django media storage
+5.  Process in batches through the DNC engine (real DB lookup)
+6.  Write clean-numbers and DNC-numbers result CSVs to media storage
 7.  Persist final counts + COMPLETED on the job
 8.  Deduct credits atomically + create CreditTransaction record
+9.  Send completion email
 
 Error handling
 --------------
-Any unhandled exception bubbles up after setting job.status = FAILED and
-writing a human-readable error_message.  Celery's built-in retry mechanism
-is NOT used — scrub jobs are not idempotent (credits would be double-charged)
-so we fail fast and let the admin/user re-submit.
+Any unhandled exception marks the job FAILED.  No Celery retries — scrub
+jobs are not idempotent (credits would be double-charged).
 """
 
 import csv
 import io
 import logging
-import os
-import tempfile
 from contextlib import contextmanager
 
 from celery import shared_task
@@ -41,24 +38,26 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = getattr(settings, 'SCRUB_BATCH_SIZE', 300_000)
 
+# Maps scrub_type key → column header used in DNC output CSV
+_TYPE_LABEL = {
+    'federal_dnc': 'Federal DNC',
+    'state_dnc':   'State DNC',
+    'litigator':   'Litigator',
+}
 
-# ── Helpers ─────────────────────────────────────────────────────────────────
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _set_status(job: ScrubJob, status: str, **extra_fields) -> None:
-    """Update only the status (+ any extra fields) to minimise DB writes."""
     for attr, val in extra_fields.items():
         setattr(job, attr, val)
     job.status = status
     fields = ['status', 'error_message'] + list(extra_fields.keys())
-    job.save(update_fields=list(dict.fromkeys(fields)))  # preserve order, no dupes
+    job.save(update_fields=list(dict.fromkeys(fields)))
 
 
 @contextmanager
 def _job_error_guard(job: ScrubJob):
-    """
-    Context manager that catches any exception, marks the job FAILED with a
-    descriptive message, then re-raises so Celery records the task as failed.
-    """
     try:
         yield
     except Exception as exc:
@@ -67,12 +66,11 @@ def _job_error_guard(job: ScrubJob):
         try:
             _set_status(job, ScrubJob.Status.FAILED, error_message=msg)
         except Exception:
-            pass  # DB might be the problem — don't mask the original error
+            pass
         raise
 
 
 def _chunk(lst: list, size: int):
-    """Yield successive `size`-length chunks from `lst`."""
     for i in range(0, len(lst), size):
         yield lst[i : i + size]
 
@@ -81,8 +79,7 @@ def _fmt(num: str) -> str:
     return f"({num[:3]}) {num[3:6]}-{num[6:]}"
 
 
-def _build_result_csv(clean_numbers: list) -> bytes:
-    """Serialise clean numbers into a UTF-8 CSV (with BOM for Excel compat)."""
+def _build_clean_csv(clean_numbers: list) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
     writer.writerow(['phone_number'])
@@ -91,18 +88,35 @@ def _build_result_csv(clean_numbers: list) -> bytes:
     return ('﻿' + buf.getvalue()).encode('utf-8')
 
 
-def _build_dnc_csv(dnc_numbers: list) -> bytes:
-    """Serialise DNC numbers with their category into a UTF-8 CSV."""
+def _build_dnc_csv(dnc_numbers: list, scrub_types: list) -> bytes:
+    """
+    Build DNC output CSV with dynamic column headers based on selected scrub types.
+
+    dnc_numbers: list of (number_str, label, state_str) tuples
+    scrub_types: list of selected scrub type keys e.g. ['federal_dnc', 'state_dnc']
+
+    Column layout:
+      - phone_number
+      - One column per selected scrub type (e.g. "Federal DNC", "State DNC")
+      - state  (always included — value blank for non-state-DNC hits)
+    """
+    selected_labels = [_TYPE_LABEL[t] for t in scrub_types if t in _TYPE_LABEL]
+
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
-    writer.writerow(['phone_number', 'dnc_type'])
-    for num, dnc_type in dnc_numbers:
-        writer.writerow([_fmt(num), dnc_type])
+    writer.writerow(['phone_number'] + selected_labels + ['state'])
+
+    for num, hit_label, state_str in dnc_numbers:
+        row = [_fmt(num)]
+        for label in selected_labels:
+            row.append('Yes' if label == hit_label else 'No')
+        row.append(state_str or '')
+        writer.writerow(row)
+
     return ('﻿' + buf.getvalue()).encode('utf-8')
 
 
 def _send_completion_email(job: ScrubJob) -> None:
-    """Email the job owner when their scrub completes."""
     from django.conf import settings as django_settings
     from django.core.mail import send_mail
 
@@ -120,13 +134,12 @@ def _send_completion_email(job: ScrubJob) -> None:
         f"  Federal DNC:    {job.dnc:,}\n"
         f"  State DNC:      {job.state_dnc:,}\n"
         f"  Litigators:     {job.litigator:,}\n\n"
-        f"Log in to download your clean list:\n"
+        f"Log in to download your results:\n"
         f"https://checkdnc.net/scrubber/\n\n"
         f"— The CheckDNC Team"
     )
     send_mail(
-        subject,
-        body,
+        subject, body,
         django_settings.DEFAULT_FROM_EMAIL,
         [user.email],
         fail_silently=True,
@@ -135,13 +148,6 @@ def _send_completion_email(job: ScrubJob) -> None:
 
 
 def _deduct_credits(job: ScrubJob, amount: int) -> None:
-    """
-    Atomically deduct `amount` credits from the job owner's balance and
-    create a CreditTransaction audit record.
-
-    Uses SELECT FOR UPDATE so concurrent jobs for the same user can't race
-    and overdraw the account below zero.
-    """
     from django.contrib.auth import get_user_model
     User = get_user_model()
 
@@ -157,14 +163,14 @@ def _deduct_credits(job: ScrubJob, amount: int) -> None:
     CreditTransaction.objects.create(
         user_id=job.user_id,
         type=CreditTransaction.Type.USAGE,
-        amount=-amount,   # negative = consumed
+        amount=-amount,
         price=0,
         scrub_job=job,
     )
     logger.info("Deducted %d credits from user %s for job %s", amount, job.user_id, job.job_id)
 
 
-# ── Custom exceptions ────────────────────────────────────────────────────────
+# ── Custom exceptions ─────────────────────────────────────────────────────────
 
 class InsufficientCreditsError(Exception):
     pass
@@ -174,21 +180,9 @@ class NoValidNumbersError(Exception):
     pass
 
 
-# ── Main task ────────────────────────────────────────────────────────────────
+# ── Main pipeline ─────────────────────────────────────────────────────────────
 
 def run_scrub_job(job_id: int) -> dict:
-    """
-    Core scrub pipeline — runs entirely synchronously without Celery.
-
-    Called by the Celery task wrapper below, and also directly (in a thread)
-    when the Celery broker is unavailable (e.g. local dev without Redis).
-
-    Args:
-        job_id: ScrubJob primary key (integer, NOT job_id string).
-
-    Returns:
-        Summary dict with final counts.
-    """
     try:
         job = ScrubJob.objects.select_related('user').get(pk=job_id)
     except ScrubJob.DoesNotExist:
@@ -199,10 +193,10 @@ def run_scrub_job(job_id: int) -> dict:
 
     with _job_error_guard(job):
 
-        # ── 1. Mark processing ───────────────────────────────────────────
+        # ── 1. Mark processing ──────────────────────────────────────────
         _set_status(job, ScrubJob.Status.PROCESSING)
 
-        # ── 2. Open uploaded file ────────────────────────────────────────
+        # ── 2. Open uploaded file ───────────────────────────────────────
         if not job.file:
             raise FileNotFoundError(f"No file attached to job {job.job_id}")
 
@@ -224,7 +218,7 @@ def run_scrub_job(job_id: int) -> dict:
 
         total = len(numbers)
 
-        # ── 3. Credit pre-flight ─────────────────────────────────────────
+        # ── 3. Credit pre-flight ────────────────────────────────────────
         from django.contrib.auth import get_user_model
         User = get_user_model()
         user = User.objects.get(pk=job.user_id)
@@ -235,21 +229,22 @@ def run_scrub_job(job_id: int) -> dict:
                 "Please top up and re-submit."
             )
 
-        # Persist total count immediately so the UI can show progress
         job.total = total
         job.save(update_fields=['total'])
 
-        # ── 4. Batch processing ──────────────────────────────────────────
-        scrub_types     = job.scrub_types or ['federal_dnc']
-        all_clean:      list = []
-        all_dnc:        list = []  # list of (number, dnc_type) tuples
-        total_dnc       = 0
-        total_state     = 0
+        # ── 4. Batch processing ─────────────────────────────────────────
+        scrub_types    = job.scrub_types or ['federal_dnc']
+        all_clean:     list = []
+        all_dnc:       list = []   # (number_str, hit_label, state_str)
+        total_dnc      = 0
+        total_state    = 0
         total_litigator = 0
 
         batches = list(_chunk(numbers, BATCH_SIZE))
-        logger.info("Job %s: processing %d batch(es) of up to %d numbers",
-                    job.job_id, len(batches), BATCH_SIZE)
+        logger.info(
+            "Job %s: processing %d batch(es) of up to %d numbers",
+            job.job_id, len(batches), BATCH_SIZE,
+        )
 
         for batch_idx, batch in enumerate(batches, start=1):
             logger.info(
@@ -260,37 +255,32 @@ def run_scrub_job(job_id: int) -> dict:
             result = run_checks(batch, scrub_types)
 
             all_clean.extend(result.clean)
-            for n in result.litigator:
-                all_dnc.append((n, 'Litigator'))
-            for n in result.federal:
-                all_dnc.append((n, 'Federal DNC'))
-            for n in result.state:
-                all_dnc.append((n, 'State DNC'))
+            for n, (label, state_str) in result.dnc_details.items():
+                all_dnc.append((n, label, state_str))
 
             total_dnc       += result.dnc_count
             total_state     += result.state_count
             total_litigator += result.litigator_count
 
-            # Live progress update after each batch
             job.clean     = len(all_clean)
             job.dnc       = total_dnc
             job.state_dnc = total_state
             job.litigator = total_litigator
             job.save(update_fields=['clean', 'dnc', 'state_dnc', 'litigator'])
 
-        # ── 5. Write result CSVs ─────────────────────────────────────────
+        # ── 5. Write result CSVs ────────────────────────────────────────
         job.result_file.save(
             f"{job.job_id}_clean.csv",
-            ContentFile(_build_result_csv(all_clean)),
+            ContentFile(_build_clean_csv(all_clean)),
             save=False,
         )
         job.result_file_dnc.save(
             f"{job.job_id}_dnc.csv",
-            ContentFile(_build_dnc_csv(all_dnc)),
+            ContentFile(_build_dnc_csv(all_dnc, scrub_types)),
             save=False,
         )
 
-        # ── 6. Persist final state ───────────────────────────────────────
+        # ── 6. Persist final state ──────────────────────────────────────
         job.status    = ScrubJob.Status.COMPLETED
         job.total     = total
         job.clean     = len(all_clean)
@@ -308,11 +298,10 @@ def run_scrub_job(job_id: int) -> dict:
             job.job_id, total, len(all_clean), total_dnc, total_litigator, total_state,
         )
 
-        # ── 7. Deduct credits ────────────────────────────────────────────
-        # Done LAST: if anything above failed we don't charge the user.
+        # ── 7. Deduct credits ───────────────────────────────────────────
         _deduct_credits(job, total)
 
-        # ── 8. Send completion email ─────────────────────────────────────
+        # ── 8. Send completion email ────────────────────────────────────
         try:
             _send_completion_email(job)
         except Exception:
@@ -332,12 +321,11 @@ def run_scrub_job(job_id: int) -> dict:
 @shared_task(
     bind=True,
     name='scrubber.tasks.process_scrub_job',
-    max_retries=0,           # no retries — see module docstring
-    acks_late=True,          # ack only after the task completes
+    max_retries=0,
+    acks_late=True,
     reject_on_worker_lost=True,
-    time_limit=3600,         # hard 1-hour cap
-    soft_time_limit=3300,    # soft cap: allows cleanup before hard kill
+    time_limit=3600,
+    soft_time_limit=3300,
 )
 def process_scrub_job(self, job_id: int) -> dict:
-    """Celery task wrapper — delegates to run_scrub_job()."""
     return run_scrub_job(job_id)

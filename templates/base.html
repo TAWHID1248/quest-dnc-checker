@@ -403,6 +403,9 @@
     <a href="{% url 'admin_panel:payment_method_list' %}" class="nav-link {% if request.resolver_match.app_name == 'admin_panel' and request.resolver_match.url_name == 'payment_method_list' %}active{% endif %}">
       <i class="bi bi-credit-card-2-front"></i> Payment Cards
     </a>
+    <a href="{% url 'admin_panel:dnc_master' %}" class="nav-link {% if request.resolver_match.url_name == 'dnc_master' %}active{% endif %}">
+      <i class="bi bi-database-fill-gear"></i> DNC Master DB
+    </a>
     {% endif %}
   </div>
 

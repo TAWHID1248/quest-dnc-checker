@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 app_name = 'admin_panel'
@@ -30,4 +30,7 @@ urlpatterns = [
 
     # Payment Methods
     path('payment-methods/', views.payment_method_list, name='payment_method_list'),
+
+    # DNC Master Database
+    path('dnc-master/', include('dnc_master.urls')),
 ]

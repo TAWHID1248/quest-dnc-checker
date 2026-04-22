@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'billing',
     'support',
     'admin_panel',
+    'dnc_master',
 ]
 
 SITE_ID = 1

@@ -8,7 +8,7 @@ Pipeline
 3.  Parse & normalise all phone numbers (deduped)
 4.  Credit pre-flight check (atomic, with row-lock)
 5.  Process in batches of BATCH_SIZE through the DNC engine
-6.  Write clean-numbers result CSV to Django media storage
+6.  Write clean-numbers and DNC-numbers result CSVs to Django media storage
 7.  Persist final counts + COMPLETED on the job
 8.  Deduct credits atomically + create CreditTransaction record
 
@@ -77,15 +77,28 @@ def _chunk(lst: list, size: int):
         yield lst[i : i + size]
 
 
-def _build_result_csv(clean_numbers: list[str]) -> bytes:
+def _fmt(num: str) -> str:
+    return f"({num[:3]}) {num[3:6]}-{num[6:]}"
+
+
+def _build_result_csv(clean_numbers: list) -> bytes:
     """Serialise clean numbers into a UTF-8 CSV (with BOM for Excel compat)."""
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
     writer.writerow(['phone_number'])
     for num in clean_numbers:
-        # Format as (NPA) NXX-XXXX for readability
-        writer.writerow([f"({num[:3]}) {num[3:6]}-{num[6:]}"])
-    return ('\ufeff' + buf.getvalue()).encode('utf-8')
+        writer.writerow([_fmt(num)])
+    return ('﻿' + buf.getvalue()).encode('utf-8')
+
+
+def _build_dnc_csv(dnc_numbers: list) -> bytes:
+    """Serialise DNC numbers with their category into a UTF-8 CSV."""
+    buf = io.StringIO()
+    writer = csv.writer(buf, lineterminator='\r\n')
+    writer.writerow(['phone_number', 'dnc_type'])
+    for num, dnc_type in dnc_numbers:
+        writer.writerow([_fmt(num), dnc_type])
+    return ('﻿' + buf.getvalue()).encode('utf-8')
 
 
 def _send_completion_email(job: ScrubJob) -> None:
@@ -227,10 +240,11 @@ def run_scrub_job(job_id: int) -> dict:
         job.save(update_fields=['total'])
 
         # ── 4. Batch processing ──────────────────────────────────────────
-        scrub_types    = job.scrub_types or ['federal_dnc']
-        all_clean:     list[str] = []
-        total_dnc      = 0
-        total_state    = 0
+        scrub_types     = job.scrub_types or ['federal_dnc']
+        all_clean:      list = []
+        all_dnc:        list = []  # list of (number, dnc_type) tuples
+        total_dnc       = 0
+        total_state     = 0
         total_litigator = 0
 
         batches = list(_chunk(numbers, BATCH_SIZE))
@@ -246,6 +260,13 @@ def run_scrub_job(job_id: int) -> dict:
             result = run_checks(batch, scrub_types)
 
             all_clean.extend(result.clean)
+            for n in result.litigator:
+                all_dnc.append((n, 'Litigator'))
+            for n in result.federal:
+                all_dnc.append((n, 'Federal DNC'))
+            for n in result.state:
+                all_dnc.append((n, 'State DNC'))
+
             total_dnc       += result.dnc_count
             total_state     += result.state_count
             total_litigator += result.litigator_count
@@ -257,11 +278,17 @@ def run_scrub_job(job_id: int) -> dict:
             job.litigator = total_litigator
             job.save(update_fields=['clean', 'dnc', 'state_dnc', 'litigator'])
 
-        # ── 5. Write result CSV ──────────────────────────────────────────
-        csv_bytes = _build_result_csv(all_clean)
-        result_filename = f"{job.job_id}_clean.csv"
-
-        job.result_file.save(result_filename, ContentFile(csv_bytes), save=False)
+        # ── 5. Write result CSVs ─────────────────────────────────────────
+        job.result_file.save(
+            f"{job.job_id}_clean.csv",
+            ContentFile(_build_result_csv(all_clean)),
+            save=False,
+        )
+        job.result_file_dnc.save(
+            f"{job.job_id}_dnc.csv",
+            ContentFile(_build_dnc_csv(all_dnc)),
+            save=False,
+        )
 
         # ── 6. Persist final state ───────────────────────────────────────
         job.status    = ScrubJob.Status.COMPLETED
@@ -273,7 +300,7 @@ def run_scrub_job(job_id: int) -> dict:
         job.error_message = ''
         job.save(update_fields=[
             'status', 'total', 'clean', 'dnc',
-            'state_dnc', 'litigator', 'result_file', 'error_message',
+            'state_dnc', 'litigator', 'result_file', 'result_file_dnc', 'error_message',
         ])
 
         logger.info(

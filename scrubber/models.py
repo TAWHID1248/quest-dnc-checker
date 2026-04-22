@@ -41,6 +41,7 @@ class ScrubJob(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     error_message = models.TextField(blank=True, help_text='Set when status=failed')
     result_file = models.FileField(upload_to='scrub_results/%Y/%m/', blank=True, null=True)
+    result_file_dnc = models.FileField(upload_to='scrub_results/%Y/%m/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

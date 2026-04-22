@@ -364,7 +364,8 @@
           <th class="text-center">State DNC</th>
           <th class="text-center">Status</th>
           <th class="text-end">Date</th>
-          <th class="text-center">Download</th>
+          <th class="text-center">Clean</th>
+          <th class="text-center">DNC</th>
         </tr>
       </thead>
       <tbody id="jobsTableBody">
@@ -390,8 +391,17 @@
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
           <td class="text-center job-download-cell">
             {% if job.result_file and job.status == 'completed' %}
-              <a href="{% url 'scrubber:download_result' job.job_id %}" class="btn btn-sm btn-outline-success" title="Download results">
-                <i class="bi bi-download"></i>
+              <a href="{% url 'scrubber:download_result' job.job_id %}" class="btn btn-sm btn-outline-success" title="Download clean numbers">
+                <i class="bi bi-download"></i> Clean
+              </a>
+            {% else %}
+              <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
+            {% endif %}
+          </td>
+          <td class="text-center job-download-dnc-cell">
+            {% if job.result_file_dnc and job.status == 'completed' %}
+              <a href="{% url 'scrubber:download_result_dnc' job.job_id %}" class="btn btn-sm btn-outline-danger" title="Download DNC numbers">
+                <i class="bi bi-download"></i> DNC
               </a>
             {% else %}
               <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
@@ -565,6 +575,9 @@ function insertJobRow(data) {
     <td class="text-center job-download-cell">
       <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
     </td>
+    <td class="text-center job-download-dnc-cell">
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
+    </td>
   `;
   tbody.insertBefore(tr, tbody.firstChild);
 
@@ -599,7 +612,11 @@ function updateJobRow(data) {
 
     const dlCell = row.querySelector('.job-download-cell');
     if (data.status === 'completed' && data.result_url) {
-      dlCell.innerHTML = `<a href="${data.result_url}" class="btn btn-sm btn-outline-success" title="Download results"><i class="bi bi-download"></i></a>`;
+      dlCell.innerHTML = `<a href="${data.result_url}" class="btn btn-sm btn-outline-success" title="Download clean numbers"><i class="bi bi-download"></i> Clean</a>`;
+    }
+    const dlDncCell = row.querySelector('.job-download-dnc-cell');
+    if (data.status === 'completed' && data.result_url_dnc) {
+      dlDncCell.innerHTML = `<a href="${data.result_url_dnc}" class="btn btn-sm btn-outline-danger" title="Download DNC numbers"><i class="bi bi-download"></i> DNC</a>`;
     }
   }
 }

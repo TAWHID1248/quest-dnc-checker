@@ -41,12 +41,13 @@ def job_status(request, job_id):
         'state_dnc': job.state_dnc,
         'error_message': job.error_message,
         'result_url': reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,
+        'result_url_dnc': reverse('scrubber:download_result_dnc', args=[job.job_id]) if job.result_file_dnc else None,
     })
 
 
 @login_required
 def download_result(request, job_id):
-    """Stream the result CSV to the browser. Enforces ownership."""
+    """Stream the clean-numbers CSV to the browser. Enforces ownership."""
     job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
     if not job.result_file or job.status != ScrubJob.Status.COMPLETED:
         raise Http404
@@ -55,6 +56,20 @@ def download_result(request, job_id):
     except (FileNotFoundError, OSError):
         raise Http404
     filename = os.path.basename(job.result_file.name)
+    return FileResponse(f, as_attachment=True, filename=filename)
+
+
+@login_required
+def download_result_dnc(request, job_id):
+    """Stream the DNC-numbers CSV to the browser. Enforces ownership."""
+    job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
+    if not job.result_file_dnc or job.status != ScrubJob.Status.COMPLETED:
+        raise Http404
+    try:
+        f = job.result_file_dnc.open('rb')
+    except (FileNotFoundError, OSError):
+        raise Http404
+    filename = os.path.basename(job.result_file_dnc.name)
     return FileResponse(f, as_attachment=True, filename=filename)
 
 

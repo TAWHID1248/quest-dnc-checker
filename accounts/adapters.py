@@ -11,6 +11,9 @@ class AccountAdapter(DefaultAccountAdapter):
 
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
+    def is_auto_signup_allowed(self, request, sociallogin):
+        return True
+
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form)
         extra = sociallogin.account.extra_data

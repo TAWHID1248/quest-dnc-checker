@@ -38,12 +38,6 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = getattr(settings, 'SCRUB_BATCH_SIZE', 300_000)
 
-# Maps scrub_type key → column header used in DNC output CSV
-_TYPE_LABEL = {
-    'federal_dnc': 'Federal DNC',
-    'state_dnc':   'State DNC',
-}
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,31 +81,13 @@ def _build_clean_csv(clean_numbers: list) -> bytes:
     return ('﻿' + buf.getvalue()).encode('utf-8')
 
 
-def _build_dnc_csv(dnc_numbers: list, scrub_types: list) -> bytes:
-    """
-    Build DNC output CSV with dynamic column headers based on selected scrub types.
-
-    dnc_numbers: list of (number_str, label, state_str) tuples
-    scrub_types: list of selected scrub type keys e.g. ['federal_dnc', 'state_dnc']
-
-    Column layout:
-      - phone_number
-      - One column per selected scrub type (e.g. "Federal DNC", "State DNC")
-      - state  (always included — value blank for non-state-DNC hits)
-    """
-    selected_labels = [_TYPE_LABEL[t] for t in scrub_types if t in _TYPE_LABEL]
-
+def _build_dnc_csv(dnc_numbers: list) -> bytes:
+    """DNC output CSV — plain list of unmatched phone numbers."""
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
-    writer.writerow(['phone_number'] + selected_labels + ['state'])
-
-    for num, hit_label, state_str in dnc_numbers:
-        row = [_fmt(num)]
-        for label in selected_labels:
-            row.append('Yes' if label == hit_label else 'No')
-        row.append(state_str or '')
-        writer.writerow(row)
-
+    writer.writerow(['phone_number'])
+    for num in dnc_numbers:
+        writer.writerow([_fmt(num)])
     return ('﻿' + buf.getvalue()).encode('utf-8')
 
 
@@ -130,8 +106,7 @@ def _send_completion_email(job: ScrubJob) -> None:
         f"  File:           {job.filename}\n"
         f"  Total numbers:  {job.total:,}\n"
         f"  Clean:          {job.clean:,} ({clean_rate}%)\n"
-        f"  Federal DNC:    {job.dnc:,}\n"
-        f"  State DNC:      {job.state_dnc:,}\n\n"
+        f"  DNC:            {job.dnc:,}\n\n"
         f"Log in to download your results:\n"
         f"https://checkdnc.net/scrubber/\n\n"
         f"— The CheckDNC Team"
@@ -231,11 +206,10 @@ def run_scrub_job(job_id: int) -> dict:
         job.save(update_fields=['total'])
 
         # ── 4. Batch processing ─────────────────────────────────────────
-        scrub_types    = job.scrub_types or ['federal_dnc']
-        all_clean:     list = []
-        all_dnc:       list = []   # (number_str, hit_label, state_str)
-        total_dnc      = 0
-        total_state    = 0
+        scrub_types = job.scrub_types or ['federal_dnc']
+        all_clean:  list = []
+        all_dnc:    list = []   # plain phone strings (unmatched)
+        total_dnc   = 0
 
         batches = list(_chunk(numbers, BATCH_SIZE))
         logger.info(
@@ -252,15 +226,12 @@ def run_scrub_job(job_id: int) -> dict:
             result = run_checks(batch, scrub_types)
 
             all_clean.extend(result.clean)
-            for n, (label, state_str) in result.dnc_details.items():
-                all_dnc.append((n, label, state_str))
-
-            total_dnc   += result.dnc_count
-            total_state += result.state_count
+            all_dnc.extend(result.dnc_numbers)
+            total_dnc += result.dnc_count
 
             job.clean     = len(all_clean)
             job.dnc       = total_dnc
-            job.state_dnc = total_state
+            job.state_dnc = 0
             job.save(update_fields=['clean', 'dnc', 'state_dnc'])
 
         # ── 5. Write result CSVs ────────────────────────────────────────
@@ -271,7 +242,7 @@ def run_scrub_job(job_id: int) -> dict:
         )
         job.result_file_dnc.save(
             f"{job.job_id}_dnc.csv",
-            ContentFile(_build_dnc_csv(all_dnc, scrub_types)),
+            ContentFile(_build_dnc_csv(all_dnc)),
             save=False,
         )
 
@@ -280,7 +251,7 @@ def run_scrub_job(job_id: int) -> dict:
         job.total     = total
         job.clean     = len(all_clean)
         job.dnc       = total_dnc
-        job.state_dnc = total_state
+        job.state_dnc = 0
         job.error_message = ''
         job.save(update_fields=[
             'status', 'total', 'clean', 'dnc',
@@ -288,8 +259,8 @@ def run_scrub_job(job_id: int) -> dict:
         ])
 
         logger.info(
-            "Job %s COMPLETED — total=%d clean=%d dnc=%d state=%d",
-            job.job_id, total, len(all_clean), total_dnc, total_state,
+            "Job %s COMPLETED — total=%d clean=%d dnc=%d",
+            job.job_id, total, len(all_clean), total_dnc,
         )
 
         # ── 7. Deduct credits ───────────────────────────────────────────

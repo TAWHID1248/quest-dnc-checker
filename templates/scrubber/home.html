@@ -502,7 +502,7 @@ function setProgress(pct, label) {
 }
 
 function showUploadError(msg) {
-  uploadError.textContent = msg;
+  uploadError.innerHTML = msg;
   uploadError.classList.remove('d-none');
   uploadProgress.classList.add('d-none');
   submitBtn.disabled = false;

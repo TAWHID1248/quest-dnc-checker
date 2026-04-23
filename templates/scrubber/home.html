@@ -420,14 +420,46 @@ function formatBytes(b) {
   return (b / 1048576).toFixed(1) + ' MB';
 }
 
+let _countToken = 0;
+
+async function countLines(file, token) {
+  const reader = file.stream().getReader();
+  const NEWLINE = 0x0A;
+  let count = 0;
+  let lastByte = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (token !== _countToken) { reader.cancel(); return null; }
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] === NEWLINE) count++;
+    }
+    if (value.length) lastByte = value[value.length - 1];
+  }
+  // Count a trailing non-empty line with no final newline
+  if (lastByte !== null && lastByte !== NEWLINE) count++;
+  return count;
+}
+
 function showFile(file) {
   fileNameEl.textContent = file.name;
   fileSizeEl.textContent = formatBytes(file.size);
   fileInfo.classList.add('show');
   submitBtn.disabled = false;
-  const est = Math.round(file.size / 12);
-  lineEst.textContent = est.toLocaleString();
-  creditEst.textContent = est.toLocaleString() + ' credits';
+
+  lineEst.textContent = 'counting…';
+  creditEst.textContent = '—';
+
+  const token = ++_countToken;
+  countLines(file, token).then(lines => {
+    if (lines === null || token !== _countToken) return;
+    lineEst.textContent = lines.toLocaleString();
+    creditEst.textContent = 'up to ' + lines.toLocaleString() + ' credits';
+  }).catch(() => {
+    if (token !== _countToken) return;
+    lineEst.textContent = '—';
+    creditEst.textContent = '—';
+  });
 }
 
 function clearFile() {

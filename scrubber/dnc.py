@@ -20,24 +20,21 @@ logger = logging.getLogger(__name__)
 LIST_TYPE_INT = {
     'federal_dnc': 1,
     'state_dnc':   2,
-    'litigator':   4,
 }
 
 # SMALLINT → human label used in DNC output CSV
 LIST_INT_LABEL = {
     1: 'Federal DNC',
     2: 'State DNC',
-    4: 'Litigator',
 }
 
 
 @dataclass
 class BatchResult:
     """Holds categorised results for one batch of numbers."""
-    clean:      list = field(default_factory=list)
-    federal:    set  = field(default_factory=set)
-    state:      set  = field(default_factory=set)
-    litigator:  set  = field(default_factory=set)
+    clean:   list = field(default_factory=list)
+    federal: set  = field(default_factory=set)
+    state:   set  = field(default_factory=set)
     # number (10-digit str) → (human_label, state_str)
     dnc_details: dict = field(default_factory=dict)
 
@@ -48,10 +45,6 @@ class BatchResult:
     @property
     def state_count(self) -> int:
         return len(self.state)
-
-    @property
-    def litigator_count(self) -> int:
-        return len(self.litigator)
 
     @property
     def clean_count(self) -> int:
@@ -65,7 +58,7 @@ def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
 
     Args:
         numbers:     List of normalised 10-digit phone strings.
-        scrub_types: Subset of ['federal_dnc', 'state_dnc', 'litigator'].
+        scrub_types: Subset of ['federal_dnc', 'state_dnc'].
     """
     if not numbers:
         return BatchResult()
@@ -87,7 +80,6 @@ def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
 
     federal:   set = set()
     state_set: set = set()
-    litigator: set = set()
     dnc_details: dict = {}
 
     try:
@@ -137,8 +129,6 @@ def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
             federal.add(n)
         elif list_type_val == 2:
             state_set.add(n)
-        elif list_type_val == 4:
-            litigator.add(n)
 
     if not rows:
         logger.debug(
@@ -152,6 +142,5 @@ def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
         clean=clean,
         federal=federal,
         state=state_set,
-        litigator=litigator,
         dnc_details=dnc_details,
     )

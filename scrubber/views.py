@@ -11,7 +11,7 @@ from .models import ScrubJob
 
 logger = logging.getLogger(__name__)
 
-_VALID_SCRUB_TYPES = {'federal_dnc', 'state_dnc', 'litigator'}
+_VALID_SCRUB_TYPES = {'federal_dnc', 'state_dnc'}
 _ALLOWED_EXTENSIONS = {'.csv', '.txt'}
 _MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB hard cap
 
@@ -37,7 +37,6 @@ def job_status(request, job_id):
         'total': job.total,
         'clean': job.clean,
         'dnc': job.dnc,
-        'litigator': job.litigator,
         'state_dnc': job.state_dnc,
         'error_message': job.error_message,
         'result_url': reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,

@@ -53,7 +53,6 @@ PRICING_TIERS = [
         'features': [
             'Federal DNC Scrubbing',
             'State DNC Scrubbing',
-            'Litigator List Scrubbing',
             'CSV & TXT Upload',
             'Downloadable Results',
             'Priority Email Support',
@@ -70,8 +69,6 @@ PRICING_TIERS = [
         'features': [
             'Federal DNC Scrubbing',
             'State DNC Scrubbing',
-            'Litigator List Scrubbing',
-            'Wireless Scrubbing',
             'CSV & TXT Upload',
             'Downloadable Results',
             'Dedicated Support',

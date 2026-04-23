@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC, State DNC, and TCPA Litigator registries and return a clean-number CSV. Access is credit-based; credits are purchased via Stripe.
+A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased via Stripe.
 
 ---
 
@@ -31,7 +31,7 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 ├── api/                    ← Vercel WSGI wrapper (api/index.py)
 ├── billing/                ← Credits, Stripe PaymentIntent/SetupIntent, webhooks
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
-│   ├── dnc.py              ← DNC check logic (federal/state/litigator)
+│   ├── dnc.py              ← DNC check logic (federal/state)
 │   ├── phone.py            ← Phone normalisation + file parsing
 │   ├── tasks.py            ← process_scrub_job Celery task
 │   ├── views.py            ← scrubber_home + job_status (AJAX) + upload handler
@@ -74,7 +74,7 @@ Custom auth user. Fields: `email` (login), `name`, `phone`, `company`, `credits`
 ### `scrubber.ScrubJob`
 One file-scrub request. Fields: `job_id` (SCR-XXXXXXXX), `user`, `filename`, `file`,
 `scrub_types` (JSONField list), `status` (PENDING→QUEUED→PROCESSING→COMPLETED|FAILED),
-`total`, `clean`, `dnc`, `state_dnc`, `litigator`, `result_file`, `error_message`.
+`total`, `clean`, `dnc`, `state_dnc`, `result_file`, `error_message`.
 
 ### `billing.CreditTransaction`
 Immutable credit ledger. Type: PURCHASE | USAGE | REFUND | ADJUSTMENT. `amount` is

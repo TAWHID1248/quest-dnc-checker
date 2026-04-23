@@ -181,24 +181,6 @@
                   </div>
                 </label>
               </div>
-              <div class="col-sm-6">
-                <label class="scrub-check-card d-flex align-items-start gap-3 w-100">
-                  <input type="checkbox" name="scrub_types" value="litigator" class="form-check-input mt-1 flex-shrink-0">
-                  <div>
-                    <div class="check-title"><i class="bi bi-person-x me-1 text-danger"></i>Litigator List</div>
-                    <div class="check-sub">Known TCPA litigators</div>
-                  </div>
-                </label>
-              </div>
-              <div class="col-sm-6">
-                <label class="scrub-check-card d-flex align-items-start gap-3 w-100" style="opacity:.55;">
-                  <input type="checkbox" name="scrub_types" value="wireless" class="form-check-input mt-1 flex-shrink-0" disabled>
-                  <div>
-                    <div class="check-title"><i class="bi bi-phone me-1"></i>Wireless <span class="badge bg-secondary ms-1" style="font-size:.65rem;">Soon</span></div>
-                    <div class="check-sub">Cell &amp; ported numbers</div>
-                  </div>
-                </label>
-              </div>
             </div>
           </div>
 
@@ -360,7 +342,6 @@
           <th class="text-center">Total</th>
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
-          <th class="text-center">Litigator</th>
           <th class="text-center">State DNC</th>
           <th class="text-center">Status</th>
           <th class="text-end">Date</th>
@@ -382,7 +363,6 @@
           <td class="text-center job-total">{{ job.total }}</td>
           <td class="text-center job-clean" style="color:#3fb950;">{{ job.clean }}</td>
           <td class="text-center job-dnc" style="color:#f85149;">{{ job.dnc }}</td>
-          <td class="text-center job-litigator" style="color:#f85149;">{{ job.litigator }}</td>
           <td class="text-center job-state" style="color:#d29922;">{{ job.state_dnc }}</td>
           <td class="text-center job-status-cell">
             <span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span>
@@ -410,7 +390,7 @@
         </tr>
         {% empty %}
         <tr id="emptyRow">
-          <td colspan="11" class="text-center py-5" style="color:#6e7681;">
+          <td colspan="10" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-inbox fs-2 d-block mb-2"></i>
             No scrub jobs yet. Upload a file above to get started.
           </td>
@@ -565,7 +545,6 @@ function insertJobRow(data) {
     <td class="text-center job-total">—</td>
     <td class="text-center job-clean" style="color:#3fb950;">—</td>
     <td class="text-center job-dnc" style="color:#f85149;">—</td>
-    <td class="text-center job-litigator" style="color:#f85149;">—</td>
     <td class="text-center job-state" style="color:#d29922;">—</td>
     <td class="text-center job-status-cell">
       <span class="status-badge status-queued">Queued</span>
@@ -596,7 +575,6 @@ function updateJobRow(data) {
   row.querySelector('.job-total').textContent = data.total ? data.total.toLocaleString() : '—';
   row.querySelector('.job-clean').textContent = data.clean ? data.clean.toLocaleString() : '—';
   row.querySelector('.job-dnc').textContent   = data.dnc   ? data.dnc.toLocaleString()   : '—';
-  row.querySelector('.job-litigator').textContent = data.litigator ? data.litigator.toLocaleString() : '—';
   row.querySelector('.job-state').textContent = data.state_dnc ? data.state_dnc.toLocaleString() : '—';
 
   const statusCell = row.querySelector('.job-status-cell');

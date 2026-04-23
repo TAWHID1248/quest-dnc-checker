@@ -28,14 +28,13 @@ class ScrubJob(models.Model):
     # Scrub configuration
     scrub_types = models.JSONField(
         default=list,
-        help_text='List of scrub types: federal_dnc, state_dnc, litigator, wireless, etc.',
+        help_text='List of scrub types: federal_dnc, state_dnc',
     )
 
     # Result counts
     total = models.PositiveIntegerField(default=0, help_text='Total numbers submitted')
     clean = models.PositiveIntegerField(default=0, help_text='Numbers that passed all scrubs')
     dnc = models.PositiveIntegerField(default=0, help_text='Federal DNC matches')
-    litigator = models.PositiveIntegerField(default=0, help_text='Litigator list matches')
     state_dnc = models.PositiveIntegerField(default=0, help_text='State DNC matches')
 
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)

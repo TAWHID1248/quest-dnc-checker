@@ -111,7 +111,6 @@
           <th class="text-center">Total</th>
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
-          <th class="text-center">Litigator</th>
           <th class="text-end">Created</th>
         </tr>
       </thead>
@@ -133,12 +132,11 @@
           <td class="text-center" style="color:#e6edf3;">{{ job.total }}</td>
           <td class="text-center" style="color:#3fb950;font-weight:600;">{{ job.clean }}</td>
           <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
-          <td class="text-center" style="color:#d29922;">{{ job.litigator }}</td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="9" class="text-center py-5" style="color:#6e7681;">
+          <td colspan="8" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-funnel fs-2 d-block mb-2"></i>
             No scrub jobs found{% if q %} matching "{{ q }}"{% endif %}.
           </td>

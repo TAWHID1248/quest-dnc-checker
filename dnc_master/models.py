@@ -4,14 +4,12 @@ from django.db import models
 LIST_TYPES = [
     ('federal_dnc', 'Federal DNC'),
     ('state_dnc', 'State DNC'),
-    ('litigator', 'Litigator'),
 ]
 
 # Maps list_type string to the SMALLINT stored in dnc_master_numbers
 LIST_TYPE_INT = {
     'federal_dnc': 1,
     'state_dnc':   2,
-    'litigator':   4,
 }
 
 LIST_TYPE_LABEL = {v: k for k, v in LIST_TYPE_INT.items()}

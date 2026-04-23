@@ -42,7 +42,6 @@ BATCH_SIZE = getattr(settings, 'SCRUB_BATCH_SIZE', 300_000)
 _TYPE_LABEL = {
     'federal_dnc': 'Federal DNC',
     'state_dnc':   'State DNC',
-    'litigator':   'Litigator',
 }
 
 
@@ -132,8 +131,7 @@ def _send_completion_email(job: ScrubJob) -> None:
         f"  Total numbers:  {job.total:,}\n"
         f"  Clean:          {job.clean:,} ({clean_rate}%)\n"
         f"  Federal DNC:    {job.dnc:,}\n"
-        f"  State DNC:      {job.state_dnc:,}\n"
-        f"  Litigators:     {job.litigator:,}\n\n"
+        f"  State DNC:      {job.state_dnc:,}\n\n"
         f"Log in to download your results:\n"
         f"https://checkdnc.net/scrubber/\n\n"
         f"— The CheckDNC Team"
@@ -238,7 +236,6 @@ def run_scrub_job(job_id: int) -> dict:
         all_dnc:       list = []   # (number_str, hit_label, state_str)
         total_dnc      = 0
         total_state    = 0
-        total_litigator = 0
 
         batches = list(_chunk(numbers, BATCH_SIZE))
         logger.info(
@@ -258,15 +255,13 @@ def run_scrub_job(job_id: int) -> dict:
             for n, (label, state_str) in result.dnc_details.items():
                 all_dnc.append((n, label, state_str))
 
-            total_dnc       += result.dnc_count
-            total_state     += result.state_count
-            total_litigator += result.litigator_count
+            total_dnc   += result.dnc_count
+            total_state += result.state_count
 
             job.clean     = len(all_clean)
             job.dnc       = total_dnc
             job.state_dnc = total_state
-            job.litigator = total_litigator
-            job.save(update_fields=['clean', 'dnc', 'state_dnc', 'litigator'])
+            job.save(update_fields=['clean', 'dnc', 'state_dnc'])
 
         # ── 5. Write result CSVs ────────────────────────────────────────
         job.result_file.save(
@@ -286,16 +281,15 @@ def run_scrub_job(job_id: int) -> dict:
         job.clean     = len(all_clean)
         job.dnc       = total_dnc
         job.state_dnc = total_state
-        job.litigator = total_litigator
         job.error_message = ''
         job.save(update_fields=[
             'status', 'total', 'clean', 'dnc',
-            'state_dnc', 'litigator', 'result_file', 'result_file_dnc', 'error_message',
+            'state_dnc', 'result_file', 'result_file_dnc', 'error_message',
         ])
 
         logger.info(
-            "Job %s COMPLETED — total=%d clean=%d dnc=%d litigator=%d state=%d",
-            job.job_id, total, len(all_clean), total_dnc, total_litigator, total_state,
+            "Job %s COMPLETED — total=%d clean=%d dnc=%d state=%d",
+            job.job_id, total, len(all_clean), total_dnc, total_state,
         )
 
         # ── 7. Deduct credits ───────────────────────────────────────────
@@ -313,7 +307,6 @@ def run_scrub_job(job_id: int) -> dict:
         'total':     job.total,
         'clean':     job.clean,
         'dnc':       job.dnc,
-        'litigator': job.litigator,
         'state_dnc': job.state_dnc,
     }
 

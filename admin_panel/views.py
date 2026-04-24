@@ -381,14 +381,10 @@ def client_create(request):
         messages.success(request, f'User {user.email} created successfully.')
         return redirect('admin_panel:client_detail', user_id=user.pk)
 
-    try:
-        return render(request, 'admin_panel/client_form.html', {
-            'form_title': 'Create User',
-            'post': {},
-        })
-    except Exception:
-        logger.exception("Error rendering client_create form for user %s", request.user.email)
-        raise
+    return render(request, 'admin_panel/client_form.html', {
+        'form_title': 'Create User',
+        'post': {'email': '', 'name': '', 'phone': '', 'company': '', 'role': 'client', 'password': ''},
+    })
 
 
 @admin_required
@@ -417,5 +413,5 @@ def client_edit(request, user_id):
     return render(request, 'admin_panel/client_form.html', {
         'form_title': f'Edit — {client.email}',
         'client': client,
-        'post': {},
+        'post': {'email': '', 'name': '', 'phone': '', 'company': '', 'role': 'client', 'password': ''},
     })

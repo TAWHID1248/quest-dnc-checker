@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
 from django.db.models import Count, Q, Sum
@@ -9,6 +11,8 @@ from billing.models import CreditTransaction, Payment, PaymentMethod
 from scrubber.models import ScrubJob
 from support.models import SupportTicket
 from .decorators import admin_required
+
+logger = logging.getLogger(__name__)
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────
@@ -367,8 +371,7 @@ def client_create(request):
                 name=name, phone=phone, company=company, role=role,
             )
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).exception('Failed to create user %s', email)
+            logger.exception('Failed to create user %s', email)
             messages.error(request, f'Error creating user: {exc}')
             return render(request, 'admin_panel/client_form.html', {
                 'form_title': 'Create User',
@@ -378,10 +381,14 @@ def client_create(request):
         messages.success(request, f'User {user.email} created successfully.')
         return redirect('admin_panel:client_detail', user_id=user.pk)
 
-    return render(request, 'admin_panel/client_form.html', {
-        'form_title': 'Create User',
-        'post': {},
-    })
+    try:
+        return render(request, 'admin_panel/client_form.html', {
+            'form_title': 'Create User',
+            'post': {},
+        })
+    except Exception:
+        logger.exception("Error rendering client_create form for user %s", request.user.email)
+        raise
 
 
 @admin_required

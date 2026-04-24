@@ -90,7 +90,7 @@ def client_list(request):
 
 @admin_required
 def client_detail(request, user_id):
-    client = get_object_or_404(CustomUser, pk=user_id, role='client')
+    client = get_object_or_404(CustomUser, pk=user_id)
 
     stats = ScrubJob.objects.filter(user=client).aggregate(
         total_numbers=Sum('total'),
@@ -119,7 +119,7 @@ def client_detail(request, user_id):
 def client_toggle(request, user_id):
     if request.method != 'POST':
         return redirect('admin_panel:client_list')
-    client = get_object_or_404(CustomUser, pk=user_id, role='client')
+    client = get_object_or_404(CustomUser, pk=user_id)
     client.is_active = not client.is_active
     client.save(update_fields=['is_active'])
     action = 'activated' if client.is_active else 'deactivated'
@@ -132,7 +132,7 @@ def client_toggle(request, user_id):
 def client_adjust_credits(request, user_id):
     if request.method != 'POST':
         return redirect('admin_panel:client_list')
-    client = get_object_or_404(CustomUser, pk=user_id, role='client')
+    client = get_object_or_404(CustomUser, pk=user_id)
     try:
         amount = int(request.POST.get('amount', 0))
     except ValueError:
@@ -361,10 +361,20 @@ def client_create(request):
         if role not in [r[0] for r in CustomUser.Role.choices]:
             role = 'client'
 
-        user = CustomUser.objects.create_user(
-            email=email, password=password,
-            name=name, phone=phone, company=company, role=role,
-        )
+        try:
+            user = CustomUser.objects.create_user(
+                email=email, password=password,
+                name=name, phone=phone, company=company, role=role,
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).exception('Failed to create user %s', email)
+            messages.error(request, f'Error creating user: {exc}')
+            return render(request, 'admin_panel/client_form.html', {
+                'form_title': 'Create User',
+                'post': request.POST,
+            })
+
         messages.success(request, f'User {user.email} created successfully.')
         return redirect('admin_panel:client_detail', user_id=user.pk)
 

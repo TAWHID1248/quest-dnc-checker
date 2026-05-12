@@ -428,6 +428,14 @@
 <!-- ── Main content ──────────────────────────────────────── -->
 <div id="main-content">
 
+  {% if dnc_last_updated %}
+  <div id="dncBanner" style="display:none;background:#161b22;border-bottom:1px solid #21262d;padding:.4rem 1.5rem;font-size:.8rem;color:#8b949e;display:flex;align-items:center;gap:.5rem;">
+    <i class="bi bi-database-fill-check" style="color:#3b82f6;flex-shrink:0;"></i>
+    Scrubber list last updated: <strong style="color:#e6edf3;margin-left:.2rem;">{{ dnc_last_updated|date:"N j, Y" }}</strong>
+    <button onclick="dismissDncBanner()" style="margin-left:auto;background:none;border:none;color:#6e7681;cursor:pointer;font-size:1rem;line-height:1;padding:0;" aria-label="Dismiss">&times;</button>
+  </div>
+  {% endif %}
+
   <!-- Topbar -->
   <header id="topbar">
     <button class="btn btn-sm btn-outline-secondary d-lg-none me-2" onclick="toggleSidebar()">
@@ -461,33 +469,6 @@
 
 </div><!-- /#main-content -->
 
-{% if dnc_last_updated %}
-<!-- DNC last-updated notice modal -->
-<div class="modal fade" id="dncUpdatedModal" tabindex="-1" aria-labelledby="dncUpdatedModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background:#0d1117;border:1px solid #21262d;">
-      <div class="modal-header" style="border-bottom:1px solid #21262d;">
-        <h6 class="modal-title d-flex align-items-center gap-2" id="dncUpdatedModalLabel" style="color:#e6edf3;">
-          <span style="width:32px;height:32px;background:#3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <i class="bi bi-database-fill-check text-white" style="font-size:.9rem;"></i>
-          </span>
-          DNC Scrubber List Status
-        </h6>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" style="color:#8b949e;font-size:.9rem;">
-        <p class="mb-0">
-          The scrubber list was last updated on
-          <strong style="color:#3fb950;">{{ dnc_last_updated|date:"N j, Y \a\t g:i A" }}</strong>.
-        </p>
-      </div>
-      <div class="modal-footer" style="border-top:1px solid #21262d;">
-        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Got it</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
 
 <!-- Bootstrap 5 JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -495,13 +476,16 @@
 <script>
   {% if dnc_last_updated %}
   (function () {
-    var key = 'dncNoticeSeen_{{ dnc_last_updated|date:"YmdHi" }}';
+    var key = 'dncBannerDismissed_{{ dnc_last_updated|date:"Ymd" }}';
     if (!sessionStorage.getItem(key)) {
-      sessionStorage.setItem(key, '1');
-      var modal = new bootstrap.Modal(document.getElementById('dncUpdatedModal'));
-      modal.show();
+      document.getElementById('dncBanner').style.display = 'flex';
     }
   })();
+  function dismissDncBanner() {
+    var key = 'dncBannerDismissed_{{ dnc_last_updated|date:"Ymd" }}';
+    sessionStorage.setItem(key, '1');
+    document.getElementById('dncBanner').style.display = 'none';
+  }
   {% endif %}
 
   function toggleSidebar() {

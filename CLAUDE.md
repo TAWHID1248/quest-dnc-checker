@@ -204,7 +204,7 @@ celery -A quest_dnc beat --loglevel=info \
 
 ## Billing / Stripe
 
-- Credit tiers: Starter $20→100K, Professional $50→500K, Enterprise $75→1M
+- Credit tiers: Starter $10→100K, Professional $20→250K, Enterprise $50→1M
 - `billing/stripe_utils.py` — PaymentIntent creation, SetupIntent for card saving
 - `billing/webhooks.py` — handles `payment_intent.succeeded` (credits top-up) and `setup_intent.succeeded` (card save)
 - Stripe webhook endpoint: `POST /billing/webhook/` (CSRF-exempt)

@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 PRICING_TIERS = [
     {
         'name': 'Starter',
-        'price': 20,
+        'price': 10,
         'credits': 100_000,
         'credits_display': '100,000',
-        'per_k': '$0.20',
+        'per_k': '$0.10',
         'highlighted': False,
         'features': [
             'Federal DNC Scrubbing',
@@ -45,10 +45,10 @@ PRICING_TIERS = [
     },
     {
         'name': 'Professional',
-        'price': 50,
-        'credits': 500_000,
-        'credits_display': '500,000',
-        'per_k': '$0.10',
+        'price': 20,
+        'credits': 250_000,
+        'credits_display': '250,000',
+        'per_k': '$0.08',
         'highlighted': True,
         'features': [
             'Federal DNC Scrubbing',
@@ -61,10 +61,10 @@ PRICING_TIERS = [
     },
     {
         'name': 'Enterprise',
-        'price': 75,
+        'price': 50,
         'credits': 1_000_000,
         'credits_display': '1,000,000',
-        'per_k': '$0.075',
+        'per_k': '$0.05',
         'highlighted': False,
         'features': [
             'Federal DNC Scrubbing',

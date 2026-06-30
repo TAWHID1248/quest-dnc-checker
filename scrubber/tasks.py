@@ -6,12 +6,22 @@ Pipeline
 1.  Load ScrubJob → mark PROCESSING
 2.  Open uploaded file from Django storage
 3.  Parse & normalise all phone numbers (deduped)
-4.  Credit pre-flight check (atomic, with row-lock)
-5.  Process in batches through the DNC engine (real DB lookup)
+4.  Credit pre-flight check (fast, non-atomic)
+5.  Process in chunks of CONTROL_CHECK_SIZE through the DNC API
+    — after each chunk, check Redis for pause / cancel signals
 6.  Write clean-numbers and DNC-numbers result CSVs to media storage
 7.  Persist final counts + COMPLETED on the job
 8.  Deduct credits atomically + create CreditTransaction record
 9.  Send completion email
+
+Pause / Resume / Cancel
+-----------------------
+- A Redis cache key ``scrub_ctrl_{job.pk}`` carries the signal: 'pause' | 'cancel'
+- Checked after every CONTROL_CHECK_SIZE numbers (default 10 000)
+- On pause: serialise accumulated results to partial_data_file, mark PAUSED, exit
+- On cancel: mark CANCELLED, delete any partial file, exit
+- On resume (job.status == PAUSED): load partial data, re-parse file, skip already-
+  processed numbers, continue from where processing left off
 
 Error handling
 --------------
@@ -21,11 +31,13 @@ jobs are not idempotent (credits would be double-charged).
 
 import csv
 import io
+import json
 import logging
 from contextlib import contextmanager
 
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.db import transaction
 
@@ -36,10 +48,62 @@ from .phone import extract_unique_numbers
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = getattr(settings, 'SCRUB_BATCH_SIZE', 300_000)
+CONTROL_CHECK_SIZE = getattr(settings, 'SCRUB_CONTROL_CHECK_SIZE', 10_000)
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Control signal helpers ────────────────────────────────────────────────────
+
+def _ctrl_key(job_pk: int) -> str:
+    return f'scrub_ctrl_{job_pk}'
+
+
+def _get_control(job_pk: int) -> str | None:
+    return cache.get(_ctrl_key(job_pk))
+
+
+def _clear_control(job_pk: int) -> None:
+    cache.delete(_ctrl_key(job_pk))
+
+
+# ── Partial-data persistence (pause / resume) ─────────────────────────────────
+
+def _save_partial(job: ScrubJob, all_clean: list, all_dnc: list) -> None:
+    payload = json.dumps({'clean': all_clean, 'dnc': all_dnc}).encode('utf-8')
+    if job.partial_data_file:
+        try:
+            job.partial_data_file.delete(save=False)
+        except Exception:
+            pass
+    job.partial_data_file.save(
+        f'{job.job_id}_partial.json',
+        ContentFile(payload),
+        save=True,
+    )
+    logger.info("Saved partial data for job %s (%d clean, %d dnc)", job.job_id, len(all_clean), len(all_dnc))
+
+
+def _load_partial(job: ScrubJob) -> tuple[list, list]:
+    if not job.partial_data_file:
+        return [], []
+    try:
+        job.partial_data_file.open('rb')
+        data = json.loads(job.partial_data_file.read())
+        job.partial_data_file.close()
+        return data.get('clean', []), data.get('dnc', [])
+    except Exception as exc:
+        logger.warning("Could not load partial data for job %s: %s", job.job_id, exc)
+        return [], []
+
+
+def _delete_partial(job: ScrubJob) -> None:
+    if job.partial_data_file:
+        try:
+            job.partial_data_file.delete(save=True)
+        except Exception:
+            pass
+
+
+# ── Generic helpers ───────────────────────────────────────────────────────────
 
 def _set_status(job: ScrubJob, status: str, **extra_fields) -> None:
     for attr, val in extra_fields.items():
@@ -65,7 +129,7 @@ def _job_error_guard(job: ScrubJob):
 
 def _chunk(lst: list, size: int):
     for i in range(0, len(lst), size):
-        yield lst[i : i + size]
+        yield lst[i: i + size]
 
 
 def _fmt(num: str) -> str:
@@ -82,7 +146,6 @@ def _build_clean_csv(clean_numbers: list) -> bytes:
 
 
 def _build_dnc_csv(dnc_numbers: list) -> bytes:
-    """DNC output CSV — plain list of unmatched phone numbers."""
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
     writer.writerow(['phone_number'])
@@ -162,14 +225,19 @@ def run_scrub_job(job_id: int) -> dict:
         logger.error("run_scrub_job called with unknown job_id=%s", job_id)
         raise
 
-    logger.info("Starting scrub job %s for user %s", job.job_id, job.user_id)
+    is_resume = job.status == ScrubJob.Status.PAUSED
+    logger.info(
+        "%s scrub job %s for user %s",
+        "Resuming" if is_resume else "Starting",
+        job.job_id, job.user_id,
+    )
 
     with _job_error_guard(job):
 
-        # ── 1. Mark processing ──────────────────────────────────────────
+        # ── 1. Mark processing ──────────────────────────────────────
         _set_status(job, ScrubJob.Status.PROCESSING)
 
-        # ── 2. Open uploaded file ───────────────────────────────────────
+        # ── 2. Open and parse uploaded file ────────────────────────
         if not job.file:
             raise FileNotFoundError(f"No file attached to job {job.job_id}")
 
@@ -191,7 +259,7 @@ def run_scrub_job(job_id: int) -> dict:
 
         total = len(numbers)
 
-        # ── 3. Credit pre-flight ────────────────────────────────────────
+        # ── 3. Credit pre-flight ────────────────────────────────────
         from django.contrib.auth import get_user_model
         User = get_user_model()
         user = User.objects.get(pk=job.user_id)
@@ -205,36 +273,57 @@ def run_scrub_job(job_id: int) -> dict:
         job.total = total
         job.save(update_fields=['total'])
 
-        # ── 4. Batch processing ─────────────────────────────────────────
-        scrub_types = job.scrub_types or ['federal_dnc']
-        all_clean:  list = []
-        all_dnc:    list = []   # plain phone strings (unmatched)
-        total_dnc   = 0
+        # ── 4. Load partial data on resume ──────────────────────────
+        if is_resume and job.processed_count > 0:
+            all_clean, all_dnc = _load_partial(job)
+            start_from = job.processed_count
+            logger.info(
+                "Job %s resuming from offset %d (%d clean, %d dnc loaded)",
+                job.job_id, start_from, len(all_clean), len(all_dnc),
+            )
+        else:
+            all_clean, all_dnc = [], []
+            start_from = 0
 
-        batches = list(_chunk(numbers, BATCH_SIZE))
+        # ── 5. Process in control-check-sized chunks ────────────────
+        scrub_types = job.scrub_types or ['federal_dnc']
+        remaining = numbers[start_from:]
+        processed_offset = start_from
+
         logger.info(
-            "Job %s: processing %d batch(es) of up to %d numbers",
-            job.job_id, len(batches), BATCH_SIZE,
+            "Job %s: %d numbers to process (starting at offset %d)",
+            job.job_id, len(remaining), start_from,
         )
 
-        for batch_idx, batch in enumerate(batches, start=1):
-            logger.info(
-                "Job %s: batch %d/%d — %d numbers",
-                job.job_id, batch_idx, len(batches), len(batch),
-            )
-
-            result = run_checks(batch, scrub_types)
-
+        for chunk in _chunk(remaining, CONTROL_CHECK_SIZE):
+            result = run_checks(chunk, scrub_types)
             all_clean.extend(result.clean)
             all_dnc.extend(result.dnc_numbers)
-            total_dnc += result.dnc_count
+            processed_offset += len(chunk)
 
-            job.clean     = len(all_clean)
-            job.dnc       = total_dnc
+            job.clean = len(all_clean)
+            job.dnc = len(all_dnc)
             job.state_dnc = 0
-            job.save(update_fields=['clean', 'dnc', 'state_dnc'])
+            job.processed_count = processed_offset
+            job.save(update_fields=['clean', 'dnc', 'state_dnc', 'processed_count'])
 
-        # ── 5. Write result CSVs ────────────────────────────────────────
+            ctrl = _get_control(job.pk)
+
+            if ctrl == 'pause':
+                _save_partial(job, all_clean, all_dnc)
+                _set_status(job, ScrubJob.Status.PAUSED, processed_count=processed_offset)
+                _clear_control(job.pk)
+                logger.info("Job %s paused at offset %d", job.job_id, processed_offset)
+                return {'job_id': job.job_id, 'status': 'paused'}
+
+            if ctrl == 'cancel':
+                _delete_partial(job)
+                _set_status(job, ScrubJob.Status.CANCELLED)
+                _clear_control(job.pk)
+                logger.info("Job %s cancelled at offset %d", job.job_id, processed_offset)
+                return {'job_id': job.job_id, 'status': 'cancelled'}
+
+        # ── 6. Write result CSVs ────────────────────────────────────
         job.result_file.save(
             f"{job.job_id}_clean.csv",
             ContentFile(_build_clean_csv(all_clean)),
@@ -246,27 +335,32 @@ def run_scrub_job(job_id: int) -> dict:
             save=False,
         )
 
-        # ── 6. Persist final state ──────────────────────────────────────
-        job.status    = ScrubJob.Status.COMPLETED
-        job.total     = total
-        job.clean     = len(all_clean)
-        job.dnc       = total_dnc
+        # ── 7. Persist final state ──────────────────────────────────
+        job.status = ScrubJob.Status.COMPLETED
+        job.total = total
+        job.clean = len(all_clean)
+        job.dnc = len(all_dnc)
         job.state_dnc = 0
+        job.processed_count = total
         job.error_message = ''
         job.save(update_fields=[
             'status', 'total', 'clean', 'dnc',
-            'state_dnc', 'result_file', 'result_file_dnc', 'error_message',
+            'state_dnc', 'processed_count',
+            'result_file', 'result_file_dnc', 'error_message',
         ])
 
         logger.info(
             "Job %s COMPLETED — total=%d clean=%d dnc=%d",
-            job.job_id, total, len(all_clean), total_dnc,
+            job.job_id, total, len(all_clean), len(all_dnc),
         )
 
-        # ── 7. Deduct credits ───────────────────────────────────────────
+        # Clean up partial file (present if this was a resumed job)
+        _delete_partial(job)
+
+        # ── 8. Deduct credits ───────────────────────────────────────
         _deduct_credits(job, total)
 
-        # ── 8. Send completion email ────────────────────────────────────
+        # ── 9. Send completion email ────────────────────────────────
         try:
             _send_completion_email(job)
         except Exception:

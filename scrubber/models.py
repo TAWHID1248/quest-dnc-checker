@@ -12,6 +12,7 @@ class ScrubJob(models.Model):
         PENDING = 'pending', 'Pending'
         QUEUED = 'queued', 'Queued'
         PROCESSING = 'processing', 'Processing'
+        PAUSED = 'paused', 'Paused'
         COMPLETED = 'completed', 'Completed'
         FAILED = 'failed', 'Failed'
         CANCELLED = 'cancelled', 'Cancelled'
@@ -41,6 +42,13 @@ class ScrubJob(models.Model):
     error_message = models.TextField(blank=True, help_text='Set when status=failed')
     result_file = models.FileField(upload_to='scrub_results/%Y/%m/', blank=True, null=True)
     result_file_dnc = models.FileField(upload_to='scrub_results/%Y/%m/', blank=True, null=True)
+
+    # Pause / resume support
+    processed_count = models.PositiveIntegerField(default=0, help_text='Numbers checked so far (used for resume)')
+    partial_data_file = models.FileField(
+        upload_to='scrub_partial/%Y/%m/', blank=True, null=True,
+        help_text='Serialised partial clean+DNC lists saved on pause',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -3,9 +3,11 @@ import os
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from .models import ScrubJob
 
@@ -31,16 +33,17 @@ def job_status(request, job_id):
     """Return JSON status for a scrub job (used by real-time polling)."""
     job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
     return JsonResponse({
-        'job_id': job.job_id,
-        'status': job.status,
-        'status_display': job.get_status_display(),
-        'total': job.total,
-        'clean': job.clean,
-        'dnc': job.dnc,
-        'state_dnc': job.state_dnc,
-        'error_message': job.error_message,
-        'result_url': reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,
-        'result_url_dnc': reverse('scrubber:download_result_dnc', args=[job.job_id]) if job.result_file_dnc else None,
+        'job_id':          job.job_id,
+        'status':          job.status,
+        'status_display':  job.get_status_display(),
+        'total':           job.total,
+        'clean':           job.clean,
+        'dnc':             job.dnc,
+        'state_dnc':       job.state_dnc,
+        'processed_count': job.processed_count,
+        'error_message':   job.error_message,
+        'result_url':      reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,
+        'result_url_dnc':  reverse('scrubber:download_result_dnc', args=[job.job_id]) if job.result_file_dnc else None,
     })
 
 
@@ -70,6 +73,54 @@ def download_result_dnc(request, job_id):
         raise Http404
     filename = os.path.basename(job.result_file_dnc.name)
     return FileResponse(f, as_attachment=True, filename=filename)
+
+
+_CTRL_ACTIVE    = {ScrubJob.Status.QUEUED, ScrubJob.Status.PROCESSING}
+_CTRL_PAUSEABLE = {ScrubJob.Status.PROCESSING}
+_CTRL_RESUMABLE = {ScrubJob.Status.PAUSED}
+_CTRL_CANCELABLE = {
+    ScrubJob.Status.QUEUED, ScrubJob.Status.PROCESSING, ScrubJob.Status.PAUSED,
+}
+
+
+@login_required
+@require_POST
+def job_control(request, job_id):
+    """Pause, resume, or cancel a running/paused scrub job."""
+    job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
+    action = request.POST.get('action', '')
+
+    def _err(msg, status=400):
+        return JsonResponse({'ok': False, 'error': msg}, status=status)
+
+    if action == 'pause':
+        if job.status not in _CTRL_PAUSEABLE:
+            return _err('Job is not processing.')
+        cache.set(f'scrub_ctrl_{job.pk}', 'pause', timeout=3600)
+        return JsonResponse({'ok': True, 'action': 'pause'})
+
+    if action == 'resume':
+        if job.status not in _CTRL_RESUMABLE:
+            return _err('Job is not paused.')
+        cache.delete(f'scrub_ctrl_{job.pk}')
+        from .tasks import process_scrub_job
+        process_scrub_job.delay(job.pk)
+        return JsonResponse({'ok': True, 'action': 'resume'})
+
+    if action == 'cancel':
+        if job.status not in _CTRL_CANCELABLE:
+            return _err('Job cannot be cancelled in its current state.')
+        if job.status == ScrubJob.Status.PAUSED:
+            # Already stopped — cancel immediately without waiting for a task
+            from .tasks import _delete_partial
+            _delete_partial(job)
+            job.status = ScrubJob.Status.CANCELLED
+            job.save(update_fields=['status'])
+        else:
+            cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+        return JsonResponse({'ok': True, 'action': 'cancel'})
+
+    return _err('Unknown action.')
 
 
 def _handle_upload(request, recent_jobs):

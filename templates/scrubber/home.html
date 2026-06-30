@@ -95,8 +95,17 @@
   .status-badge { font-size:.75rem; padding:.25rem .65rem; border-radius:20px; font-weight:600; }
   .status-completed  { background:#1a3a2a; color:#3fb950; }
   .status-processing { background:#1a2a3a; color:#3b82f6; }
+  .status-paused     { background:#2a1a3a; color:#a78bfa; }
   .status-failed     { background:#3a1a1a; color:#f85149; }
+  .status-cancelled  { background:#21262d; color:#6e7681; }
   .status-pending, .status-queued { background:#2a2a1a; color:#d29922; }
+
+  /* Control buttons */
+  .ctrl-btn { font-size:.72rem; padding:.2rem .55rem; border-radius:6px; line-height:1.4; }
+
+  /* Progress bar inside table row */
+  .row-progress { height:4px; background:#21262d; border-radius:2px; margin-top:3px; }
+  .row-progress-bar { height:4px; background:#3b82f6; border-radius:2px; transition:width .5s ease; }
 
   /* Live spinner for active rows */
   .row-spinner {
@@ -342,9 +351,9 @@
           <th class="text-center">Total</th>
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
-          <th class="text-center">State DNC</th>
           <th class="text-center">Status</th>
           <th class="text-end">Date</th>
+          <th class="text-center">Controls</th>
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
         </tr>
@@ -352,7 +361,7 @@
       <tbody id="jobsTableBody">
         {% for job in recent_jobs %}
         <tr id="row-{{ job.job_id }}"
-            {% if job.status in 'pending,queued,processing' %}data-polling="{{ job.job_id }}"{% endif %}>
+            {% if job.status in 'pending,queued,processing,paused' %}data-polling="{{ job.job_id }}"{% endif %}>
           <td><span style="color:#3b82f6;font-family:monospace;font-size:.8rem;">{{ job.job_id }}</span></td>
           <td style="max-width:150px;" class="text-truncate" title="{{ job.filename }}">{{ job.filename }}</td>
           <td>
@@ -363,12 +372,45 @@
           <td class="text-center job-total">{{ job.total }}</td>
           <td class="text-center job-clean" style="color:#3fb950;">{{ job.clean }}</td>
           <td class="text-center job-dnc" style="color:#f85149;">{{ job.dnc }}</td>
-          <td class="text-center job-state" style="color:#d29922;">{{ job.state_dnc }}</td>
           <td class="text-center job-status-cell">
             <span class="status-badge status-{{ job.status }}">{{ job.get_status_display }}</span>
             {% if job.status in 'pending,queued,processing' %}<span class="row-spinner"></span>{% endif %}
+            {% if job.total and job.status == 'processing' %}
+            <div class="row-progress mt-1">
+              <div class="row-progress-bar" style="width:{{ job.clean|add:job.dnc }}px"
+                   data-total="{{ job.total }}" data-done="{{ job.clean|add:job.dnc }}"></div>
+            </div>
+            {% endif %}
           </td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
+          <td class="text-center job-ctrl-cell" style="white-space:nowrap;">
+            {% if job.status == 'processing' %}
+              <button class="btn btn-sm btn-outline-warning ctrl-btn me-1"
+                      onclick="ctrlJob('{{ job.job_id }}','pause',this)" title="Pause">
+                <i class="bi bi-pause-fill"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger ctrl-btn"
+                      onclick="ctrlJob('{{ job.job_id }}','cancel',this)" title="Cancel">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            {% elif job.status == 'paused' %}
+              <button class="btn btn-sm btn-outline-success ctrl-btn me-1"
+                      onclick="ctrlJob('{{ job.job_id }}','resume',this)" title="Resume">
+                <i class="bi bi-play-fill"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger ctrl-btn"
+                      onclick="ctrlJob('{{ job.job_id }}','cancel',this)" title="Cancel">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            {% elif job.status in 'queued,pending' %}
+              <button class="btn btn-sm btn-outline-danger ctrl-btn"
+                      onclick="ctrlJob('{{ job.job_id }}','cancel',this)" title="Cancel">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            {% else %}
+              <span style="color:#6e7681;font-size:.75rem;">—</span>
+            {% endif %}
+          </td>
           <td class="text-center job-download-cell">
             {% if job.result_file and job.status == 'completed' %}
               <a href="{% url 'scrubber:download_result' job.job_id %}" class="btn btn-sm btn-outline-success" title="Download clean numbers">
@@ -390,7 +432,7 @@
         </tr>
         {% empty %}
         <tr id="emptyRow">
-          <td colspan="10" class="text-center py-5" style="color:#6e7681;">
+          <td colspan="11" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-inbox fs-2 d-block mb-2"></i>
             No scrub jobs yet. Upload a file above to get started.
           </td>
@@ -555,9 +597,27 @@ scrubForm.addEventListener('submit', function(e) {
 });
 
 // ── Jobs table helpers ────────────────────────────────────────────────
+const CSRFTOKEN = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+function _ctrlButtons(jobId, status) {
+  if (status === 'processing') {
+    return `
+      <button class="btn btn-sm btn-outline-warning ctrl-btn me-1" onclick="ctrlJob('${jobId}','pause',this)" title="Pause"><i class="bi bi-pause-fill"></i></button>
+      <button class="btn btn-sm btn-outline-danger ctrl-btn" onclick="ctrlJob('${jobId}','cancel',this)" title="Cancel"><i class="bi bi-x-lg"></i></button>`;
+  }
+  if (status === 'paused') {
+    return `
+      <button class="btn btn-sm btn-outline-success ctrl-btn me-1" onclick="ctrlJob('${jobId}','resume',this)" title="Resume"><i class="bi bi-play-fill"></i></button>
+      <button class="btn btn-sm btn-outline-danger ctrl-btn" onclick="ctrlJob('${jobId}','cancel',this)" title="Cancel"><i class="bi bi-x-lg"></i></button>`;
+  }
+  if (status === 'queued' || status === 'pending') {
+    return `<button class="btn btn-sm btn-outline-danger ctrl-btn" onclick="ctrlJob('${jobId}','cancel',this)" title="Cancel"><i class="bi bi-x-lg"></i></button>`;
+  }
+  return '<span style="color:#6e7681;font-size:.75rem;">—</span>';
+}
+
 function insertJobRow(data) {
   const tbody = document.getElementById('jobsTableBody');
-  // Remove empty-state row if present
   const emptyRow = document.getElementById('emptyRow');
   if (emptyRow) emptyRow.remove();
 
@@ -577,12 +637,12 @@ function insertJobRow(data) {
     <td class="text-center job-total">—</td>
     <td class="text-center job-clean" style="color:#3fb950;">—</td>
     <td class="text-center job-dnc" style="color:#f85149;">—</td>
-    <td class="text-center job-state" style="color:#d29922;">—</td>
     <td class="text-center job-status-cell">
       <span class="status-badge status-queued">Queued</span>
       <span class="row-spinner"></span>
     </td>
     <td class="text-end" style="color:#6e7681;white-space:nowrap;">${today}</td>
+    <td class="text-center job-ctrl-cell" style="white-space:nowrap;">${_ctrlButtons(data.job_id, 'queued')}</td>
     <td class="text-center job-download-cell">
       <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>
     </td>
@@ -592,7 +652,6 @@ function insertJobRow(data) {
   `;
   tbody.insertBefore(tr, tbody.firstChild);
 
-  // Update job count badge
   const countEl = document.getElementById('jobCount');
   if (countEl) {
     const current = parseInt(countEl.textContent) || 0;
@@ -607,36 +666,90 @@ function updateJobRow(data) {
   row.querySelector('.job-total').textContent = data.total ? data.total.toLocaleString() : '—';
   row.querySelector('.job-clean').textContent = data.clean ? data.clean.toLocaleString() : '—';
   row.querySelector('.job-dnc').textContent   = data.dnc   ? data.dnc.toLocaleString()   : '—';
-  row.querySelector('.job-state').textContent = data.state_dnc ? data.state_dnc.toLocaleString() : '—';
 
+  // Progress bar (only while processing)
   const statusCell = row.querySelector('.job-status-cell');
   const spinner = statusCell.querySelector('.row-spinner');
   const badge = statusCell.querySelector('.status-badge');
   badge.className = `status-badge status-${data.status}`;
   badge.textContent = data.status_display;
 
+  // Inline progress bar
+  let progressBar = statusCell.querySelector('.row-progress');
+  if (data.status === 'processing' && data.total > 0) {
+    const pct = Math.min(100, Math.round((data.processed_count / data.total) * 100));
+    if (!progressBar) {
+      progressBar = document.createElement('div');
+      progressBar.className = 'row-progress mt-1';
+      progressBar.innerHTML = '<div class="row-progress-bar"></div>';
+      statusCell.appendChild(progressBar);
+    }
+    progressBar.querySelector('.row-progress-bar').style.width = pct + '%';
+  } else if (progressBar) {
+    progressBar.remove();
+  }
+
+  // Spinner
+  if (['processing', 'queued', 'pending'].includes(data.status)) {
+    if (!spinner) {
+      const s = document.createElement('span');
+      s.className = 'row-spinner';
+      statusCell.insertBefore(s, statusCell.querySelector('.row-progress') || null);
+    }
+  } else {
+    if (spinner) spinner.remove();
+  }
+
+  // Control buttons
+  const ctrlCell = row.querySelector('.job-ctrl-cell');
+  if (ctrlCell) ctrlCell.innerHTML = _ctrlButtons(data.job_id, data.status);
+
   const terminal = ['completed', 'failed', 'cancelled'];
   if (terminal.includes(data.status)) {
-    if (spinner) spinner.remove();
     row.removeAttribute('data-polling');
+  }
 
+  if (data.status === 'completed') {
     const dlCell = row.querySelector('.job-download-cell');
-    if (data.status === 'completed' && data.result_url) {
-      dlCell.innerHTML = `<a href="${data.result_url}" class="btn btn-sm btn-outline-success" title="Download clean numbers"><i class="bi bi-download"></i> Clean</a>`;
+    if (data.result_url) {
+      dlCell.innerHTML = `<a href="${data.result_url}" class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i> Clean</a>`;
     }
     const dlDncCell = row.querySelector('.job-download-dnc-cell');
-    if (data.status === 'completed' && data.result_url_dnc) {
-      dlDncCell.innerHTML = `<a href="${data.result_url_dnc}" class="btn btn-sm btn-outline-danger" title="Download DNC numbers"><i class="bi bi-download"></i> DNC</a>`;
+    if (data.result_url_dnc) {
+      dlDncCell.innerHTML = `<a href="${data.result_url_dnc}" class="btn btn-sm btn-outline-danger"><i class="bi bi-download"></i> DNC</a>`;
     }
   }
 }
 
+// ── Job control (pause / resume / cancel) ────────────────────────────
+function ctrlJob(jobId, action, btn) {
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+  fetch(`/scrubber/control/${jobId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': CSRFTOKEN,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: `action=${action}`,
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      showToast(`<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>${data.error || 'Action failed.'}`, 'error');
+    }
+    // Polling will update the row automatically
+  })
+  .catch(() => {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  });
+}
+
 // ── Real-time polling ─────────────────────────────────────────────────
-const pollingIntervals = new Map(); // job_id -> intervalId
+const pollingIntervals = new Map();
 
 function startPolling(jobId) {
   if (pollingIntervals.has(jobId)) return;
-  // Poll immediately, then every 3 seconds
   pollJob(jobId);
   const id = setInterval(() => pollJob(jobId), 3000);
   pollingIntervals.set(jobId, id);
@@ -670,7 +783,17 @@ function pollJob(jobId) {
             + `Job <strong>${jobId}</strong> failed. ${data.error_message || ''}`,
             'error'
           );
+        } else if (data.status === 'cancelled') {
+          showToast(
+            `<i class="bi bi-x-circle-fill text-secondary me-2"></i>`
+            + `Job <strong>${jobId}</strong> cancelled.`,
+            'error'
+          );
         }
+      }
+      // Keep polling paused jobs (so resume status shows up)
+      if (data.status === 'paused' && !pollingIntervals.has(jobId)) {
+        startPolling(jobId);
       }
     })
     .catch(() => { /* network error — keep polling */ });
@@ -690,7 +813,7 @@ function showToast(html, type = 'success') {
   }, 6000);
 }
 
-// ── Start polling for any active jobs already in the table ────────────
+// ── Start polling for any active / paused jobs already in the table ──
 document.querySelectorAll('[data-polling]').forEach(row => {
   startPolling(row.getAttribute('data-polling'));
 });

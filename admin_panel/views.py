@@ -1,8 +1,10 @@
 import logging
+import os
 
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
 from django.db.models import Count, Q, Sum
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -334,6 +336,22 @@ def payment_method_list(request):
         'q':       q,
         'total':   methods.count(),
     })
+
+
+# ── Download original uploaded file (admin) ────────────────────────────────
+
+@admin_required
+def download_user_upload(request, job_id):
+    """Allow an admin to download the original file a user uploaded for a scrub job."""
+    job = get_object_or_404(ScrubJob, job_id=job_id)
+    if not job.file:
+        raise Http404
+    try:
+        f = job.file.open('rb')
+    except (FileNotFoundError, OSError):
+        raise Http404
+    filename = os.path.basename(job.file.name)
+    return FileResponse(f, as_attachment=True, filename=filename)
 
 
 # ── Client Create / Edit ───────────────────────────────────────────────────

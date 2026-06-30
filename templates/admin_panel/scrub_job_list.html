@@ -112,6 +112,7 @@
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
           <th class="text-end">Created</th>
+          <th class="text-center">Uploaded File</th>
         </tr>
       </thead>
       <tbody>
@@ -133,10 +134,20 @@
           <td class="text-center" style="color:#3fb950;font-weight:600;">{{ job.clean }}</td>
           <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
+          <td class="text-center">
+            {% if job.file %}
+              <a href="{% url 'admin_panel:download_user_upload' job.job_id %}"
+                 class="btn btn-sm btn-outline-primary" title="Download original uploaded file">
+                <i class="bi bi-download me-1"></i>Download
+              </a>
+            {% else %}
+              <span style="color:#6e7681;font-size:.78rem;">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center py-5" style="color:#6e7681;">
+          <td colspan="9" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-funnel fs-2 d-block mb-2"></i>
             No scrub jobs found{% if q %} matching "{{ q }}"{% endif %}.
           </td>

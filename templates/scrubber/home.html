@@ -742,6 +742,7 @@ function ctrlJob(jobId, action, btn) {
   })
   .catch(() => {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    showToast('<i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Action failed — please try again.', 'error');
   });
 }
 

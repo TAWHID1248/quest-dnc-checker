@@ -96,13 +96,19 @@ def job_control(request, job_id):
     if action == 'pause':
         if job.status not in _CTRL_PAUSEABLE:
             return _err('Job is not processing.')
-        cache.set(f'scrub_ctrl_{job.pk}', 'pause', timeout=3600)
+        try:
+            cache.set(f'scrub_ctrl_{job.pk}', 'pause', timeout=3600)
+        except Exception:
+            return _err('Could not send pause signal — please try again.', status=503)
         return JsonResponse({'ok': True, 'action': 'pause'})
 
     if action == 'resume':
         if job.status not in _CTRL_RESUMABLE:
             return _err('Job is not paused.')
-        cache.delete(f'scrub_ctrl_{job.pk}')
+        try:
+            cache.delete(f'scrub_ctrl_{job.pk}')
+        except Exception:
+            pass  # stale key is harmless; worker checks DB status
         from .tasks import process_scrub_job
         process_scrub_job.delay(job.pk)
         return JsonResponse({'ok': True, 'action': 'resume'})
@@ -117,7 +123,10 @@ def job_control(request, job_id):
             job.status = ScrubJob.Status.CANCELLED
             job.save(update_fields=['status'])
         else:
-            cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+            try:
+                cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+            except Exception:
+                return _err('Could not send cancel signal — please try again.', status=503)
         return JsonResponse({'ok': True, 'action': 'cancel'})
 
     return _err('Unknown action.')

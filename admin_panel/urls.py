@@ -25,6 +25,7 @@ urlpatterns = [
     # Scrub Jobs (global)
     path('scrub-jobs/', views.scrub_job_list, name='scrub_job_list'),
     path('scrub-jobs/<str:job_id>/download-upload/', views.download_user_upload, name='download_user_upload'),
+    path('scrub-jobs/<str:job_id>/force-cancel/', views.force_cancel_job, name='force_cancel_job'),
 
     # Credit Transactions (global)
     path('transactions/', views.transaction_list, name='transaction_list'),

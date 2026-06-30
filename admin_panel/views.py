@@ -338,6 +338,42 @@ def payment_method_list(request):
     })
 
 
+# ── Force-cancel / force-fail a stuck job (admin) ─────────────────────────
+
+@admin_required
+def force_cancel_job(request, job_id):
+    """
+    Immediately mark a job CANCELLED regardless of Celery task state.
+    Also writes the Redis cancel signal so a still-running worker stops ASAP.
+    """
+    if request.method != 'POST':
+        return redirect('admin_panel:scrub_job_list')
+
+    job = get_object_or_404(ScrubJob, job_id=job_id)
+
+    _active = {
+        ScrubJob.Status.PENDING,
+        ScrubJob.Status.QUEUED,
+        ScrubJob.Status.PROCESSING,
+        ScrubJob.Status.PAUSED,
+    }
+    if job.status not in _active:
+        messages.warning(request, f'Job {job.job_id} is already in a terminal state.')
+        return redirect('admin_panel:scrub_job_list')
+
+    # Signal the worker if it's still running
+    from django.core.cache import cache
+    cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+
+    # Force DB state immediately — don't wait for the worker to respond
+    job.status = ScrubJob.Status.CANCELLED
+    job.error_message = 'Force-cancelled by admin'
+    job.save(update_fields=['status', 'error_message'])
+
+    messages.success(request, f'Job {job.job_id} has been force-cancelled.')
+    return redirect('admin_panel:scrub_job_list')
+
+
 # ── Download original uploaded file (admin) ────────────────────────────────
 
 @admin_required

@@ -24,6 +24,7 @@
   .js-completed  { background:#1a3a2a;color:#3fb950; }
   .js-failed     { background:#3a1218;color:#f85149; }
   .js-cancelled  { background:#21262d;color:#6e7681; }
+  .js-paused     { background:#2a1a3a;color:#a78bfa; }
   .mini-avatar { width:28px;height:28px;border-radius:50%;background:#21262d;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#e6edf3;flex-shrink:0; }
 </style>
 {% endblock %}
@@ -76,8 +77,14 @@
   <a href="?status=completed{% if q %}&q={{ q }}{% endif %}" class="stab stab-completed {% if status_filter == 'completed' %}active{% endif %}">
     Completed <span class="count-pill">{{ counts.completed }}</span>
   </a>
+  <a href="?status=paused{% if q %}&q={{ q }}{% endif %}" class="stab stab-processing {% if status_filter == 'paused' %}active{% endif %}">
+    Paused <span class="count-pill">{{ counts.paused|default:0 }}</span>
+  </a>
   <a href="?status=failed{% if q %}&q={{ q }}{% endif %}" class="stab stab-failed {% if status_filter == 'failed' %}active{% endif %}">
     Failed <span class="count-pill">{{ counts.failed }}</span>
+  </a>
+  <a href="?status=cancelled{% if q %}&q={{ q }}{% endif %}" class="stab stab-all {% if status_filter == 'cancelled' %}active{% endif %}">
+    Cancelled <span class="count-pill">{{ counts.cancelled|default:0 }}</span>
   </a>
 </div>
 
@@ -112,7 +119,7 @@
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
           <th class="text-end">Created</th>
-          <th class="text-center">Uploaded File</th>
+          <th class="text-center">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -134,13 +141,24 @@
           <td class="text-center" style="color:#3fb950;font-weight:600;">{{ job.clean }}</td>
           <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
-          <td class="text-center">
+          <td class="text-center" style="white-space:nowrap;">
             {% if job.file %}
               <a href="{% url 'admin_panel:download_user_upload' job.job_id %}"
-                 class="btn btn-sm btn-outline-primary" title="Download original uploaded file">
-                <i class="bi bi-download me-1"></i>Download
+                 class="btn btn-sm btn-outline-primary me-1" title="Download original uploaded file">
+                <i class="bi bi-download"></i>
               </a>
-            {% else %}
+            {% endif %}
+            {% if job.status in 'pending,queued,processing,paused' %}
+              <form method="post" action="{% url 'admin_panel:force_cancel_job' job.job_id %}"
+                    style="display:inline;"
+                    onsubmit="return confirm('Force-cancel job {{ job.job_id }}? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Force cancel">
+                  <i class="bi bi-x-octagon"></i>
+                </button>
+              </form>
+            {% endif %}
+            {% if not job.file and job.status not in 'pending,queued,processing,paused' %}
               <span style="color:#6e7681;font-size:.78rem;">—</span>
             {% endif %}
           </td>

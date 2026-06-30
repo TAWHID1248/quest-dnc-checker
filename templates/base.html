@@ -434,9 +434,22 @@
     <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
 
     {% if user.is_authenticated %}
-    <span class="credits-badge">
-      <i class="bi bi-coin me-1"></i>{{ user.credits|floatformat:2 }} credits
-    </span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="credits-badge">
+        <i class="bi bi-coin me-1"></i>{{ user.credits|floatformat:2 }} credits
+      </span>
+      {% if user.is_admin %}
+      <form method="post" action="/panel/clients/{{ user.id }}/credits/"
+            onsubmit="return confirm('Add 100,000 credits to your account?');">
+        {% csrf_token %}
+        <input type="hidden" name="amount" value="100000">
+        <input type="hidden" name="next" value="list">
+        <button type="submit" class="btn btn-sm btn-success fw-semibold" style="padding:.2rem .6rem;font-size:.78rem;">
+          <i class="bi bi-plus-lg"></i> 100K
+        </button>
+      </form>
+      {% endif %}
+    </div>
     {% endif %}
   </header>
 

@@ -113,7 +113,18 @@
                 onclick="event.stopPropagation(); openSendCredits('{{ c.id }}', '{{ c.email|escapejs }}', '{{ c.display_name|truncatechars:20|escapejs }}', '{{ c.credits }}')">
                 <i class="bi bi-coin"></i>
               </button>
-              <form method="post" action="{% url 'admin_panel:client_toggle' c.id %}" class="d-inline">
+              <form method="post" action="{% url 'admin_panel:client_credits' c.id %}" class="d-inline"
+                    onclick="event.stopPropagation()">
+                {% csrf_token %}
+                <input type="hidden" name="amount" value="100000">
+                <input type="hidden" name="next" value="list">
+                <button type="submit" class="btn btn-sm btn-success fw-semibold" title="Add 100,000 credits"
+                        onclick="return confirm('Add 100,000 credits to {{ c.email|escapejs }}?')">
+                  <i class="bi bi-plus-lg"></i>100K
+                </button>
+              </form>
+              <form method="post" action="{% url 'admin_panel:client_toggle' c.id %}" class="d-inline"
+                    onclick="event.stopPropagation()">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{% url 'admin_panel:client_list' %}">
                 <button type="submit"

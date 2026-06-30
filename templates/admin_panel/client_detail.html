@@ -68,6 +68,15 @@
       <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#creditsModal">
         <i class="bi bi-coin me-1"></i>Adjust Credits
       </button>
+      <!-- Quick +100K -->
+      <form method="post" action="{% url 'admin_panel:client_credits' client.id %}" style="display:inline;"
+            onsubmit="return confirm('Add 100,000 credits to {{ client.email }}?');">
+        {% csrf_token %}
+        <input type="hidden" name="amount" value="100000">
+        <button type="submit" class="btn btn-sm btn-success">
+          <i class="bi bi-plus-lg me-1"></i>+100K Credits
+        </button>
+      </form>
     </div>
   </div>
 </div>

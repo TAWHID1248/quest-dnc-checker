@@ -181,6 +181,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SCRUB_BATCH_SIZE = 300_000          # numbers per DNC-check batch
 SCRUB_MAX_FILE_SIZE_MB = 200        # upload cap shown in UI
 
+# DNC API
+DNC_API_KEY         = config('DNC_API_KEY', default='')
+DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=50, cast=int)
+
 # Stripe
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')

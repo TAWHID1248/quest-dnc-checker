@@ -1,35 +1,33 @@
 """
-Scrubbing engine — cross-checks user numbers against dnc_master_numbers.
+DNC scrubbing engine — checks numbers against the live DNC API.
 
-Semantics (whitelist mode):
-    matched in master   →  CLEAN
-    not matched         →  DNC
+Each number is checked via GET /api/v1/check/. A ThreadPoolExecutor runs
+checks concurrently for acceptable throughput on large batches.
 
-Uses a PostgreSQL TEMP TABLE + JOIN for maximum throughput.  If the master
-table is empty (not yet loaded by admin) every submitted number falls into
-the DNC bucket (nothing matched) and a warning is logged.
+Semantics:
+    is_dnc = true  →  DNC   (removed from clean list)
+    is_dnc = false →  CLEAN
+
+On any API error the number is conservatively placed in the DNC bucket.
 """
 
-import io
+import concurrent.futures
 import logging
 from dataclasses import dataclass, field
 
-from django.db import connection
+import requests
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# list_type string → SMALLINT stored in dnc_master_numbers
-LIST_TYPE_INT = {
-    'federal_dnc': 1,
-    'state_dnc':   2,
-}
+DNC_API_URL = 'https://donotcalldnc.com/api/v1/check/'
 
 
 @dataclass
 class BatchResult:
     """Categorised results for one batch of numbers."""
-    clean:       list = field(default_factory=list)  # matched → clean
-    dnc_numbers: list = field(default_factory=list)  # unmatched → DNC
+    clean:       list = field(default_factory=list)
+    dnc_numbers: list = field(default_factory=list)
 
     @property
     def clean_count(self) -> int:
@@ -40,87 +38,61 @@ class BatchResult:
         return len(self.dnc_numbers)
 
 
+def _check_one(number: str, api_key: str) -> tuple[str, bool]:
+    """Check a single number. Returns (number, is_dnc). Treats errors as DNC."""
+    try:
+        resp = requests.get(
+            DNC_API_URL,
+            params={'phone': number},
+            headers={'X-API-KEY': api_key},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('success'):
+                return number, bool(data.get('is_dnc', True))
+            logger.warning("DNC API non-success body for %s: %s", number, data)
+        else:
+            logger.warning("DNC API HTTP %s for %s: %s", resp.status_code, number, resp.text[:200])
+    except requests.Timeout:
+        logger.warning("DNC API timeout for %s", number)
+    except Exception as exc:
+        logger.exception("DNC API error for %s: %s", number, exc)
+    return number, True  # fail-safe: treat as DNC on any error
+
+
 def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
     """
-    Cross-check `numbers` against dnc_master_numbers for the requested
-    scrub_types.
+    Check each number against the live DNC API.
 
     Args:
         numbers:     List of normalised 10-digit phone strings.
-        scrub_types: Subset of ['federal_dnc', 'state_dnc']. Determines
-                     which master list types to match against.
+        scrub_types: Kept for interface compatibility — the external API performs
+                     a unified DNC check regardless of list type.
 
     Returns:
-        BatchResult where `clean` = matched numbers, `dnc_numbers` = unmatched.
+        BatchResult where `clean` = not-on-DNC, `dnc_numbers` = DNC matches.
     """
     if not numbers:
         return BatchResult()
 
-    type_values = [LIST_TYPE_INT[t] for t in scrub_types if t in LIST_TYPE_INT]
-    if not type_values:
-        # No master types selected → nothing can match → all DNC
+    api_key = getattr(settings, 'DNC_API_KEY', '')
+    if not api_key:
+        logger.error("DNC_API_KEY not configured — treating all numbers as DNC")
         return BatchResult(dnc_numbers=list(numbers))
 
-    # Map integer → original string for result reconstruction
-    int_to_str: dict[int, str] = {}
-    for n in numbers:
-        try:
-            int_to_str[int(n)] = n
-        except (ValueError, TypeError):
-            pass
+    max_workers = getattr(settings, 'DNC_API_CONCURRENCY', 50)
 
-    if not int_to_str:
-        return BatchResult(dnc_numbers=list(numbers))
-
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "CREATE TEMP TABLE IF NOT EXISTS _scrub_input (number BIGINT)"
-            )
-            cursor.execute("TRUNCATE _scrub_input")
-
-            buf = io.StringIO()
-            for n in int_to_str:
-                buf.write(f"{n}\n")
-            buf.seek(0)
-            cursor.copy_from(buf, '_scrub_input', columns=('number',))
-
-            placeholders = ','.join(['%s'] * len(type_values))
-            cursor.execute(
-                f"""
-                SELECT DISTINCT i.number
-                FROM _scrub_input i
-                JOIN dnc_master_numbers d ON d.number = i.number
-                WHERE d.list_type IN ({placeholders})
-                """,
-                type_values,
-            )
-            matched_rows = cursor.fetchall()
-
-    except Exception as exc:
-        logger.exception("Master lookup failed, returning all numbers as DNC: %s", exc)
-        return BatchResult(dnc_numbers=list(numbers))
-
-    matched_ints: set = {row[0] for row in matched_rows}
-
-    if not matched_ints:
-        logger.debug(
-            "No master matches found for %d numbers (master table may be empty)",
-            len(numbers),
-        )
-
-    # Inverted: matched = clean, unmatched = DNC
-    clean:       list = []
+    clean: list = []
     dnc_numbers: list = []
-    for n in numbers:
-        try:
-            n_int = int(n)
-        except (ValueError, TypeError):
-            dnc_numbers.append(n)
-            continue
-        if n_int in matched_ints:
-            clean.append(n)
-        else:
-            dnc_numbers.append(n)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_check_one, n, api_key): n for n in numbers}
+        for future in concurrent.futures.as_completed(futures):
+            number, is_dnc = future.result()
+            if is_dnc:
+                dnc_numbers.append(number)
+            else:
+                clean.append(number)
 
     return BatchResult(clean=clean, dnc_numbers=dnc_numbers)

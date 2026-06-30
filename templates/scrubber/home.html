@@ -347,7 +347,7 @@
         <tr>
           <th>Job ID</th>
           <th>Filename</th>
-          <th>Scrub Types</th>
+          <th class="text-center">Time</th>
           <th class="text-center">Total</th>
           <th class="text-center">Clean</th>
           <th class="text-center">DNC</th>
@@ -364,10 +364,8 @@
             {% if job.status in 'pending,queued,processing,paused' %}data-polling="{{ job.job_id }}"{% endif %}>
           <td><span style="color:#3b82f6;font-family:monospace;font-size:.8rem;">{{ job.job_id }}</span></td>
           <td style="max-width:150px;" class="text-truncate" title="{{ job.filename }}">{{ job.filename }}</td>
-          <td>
-            {% for t in job.scrub_types %}
-              <span class="badge bg-dark border" style="font-size:.68rem;border-color:#30363d!important;">{{ t|upper }}</span>
-            {% endfor %}
+          <td class="text-center job-duration" style="color:#8b949e;font-size:.82rem;white-space:nowrap;">
+            {{ job.duration|default:"—" }}
           </td>
           <td class="text-center job-total">{{ job.total }}</td>
           <td class="text-center job-clean" style="color:#3fb950;">{{ job.clean }}</td>
@@ -621,10 +619,6 @@ function insertJobRow(data) {
   const emptyRow = document.getElementById('emptyRow');
   if (emptyRow) emptyRow.remove();
 
-  const typeBadges = (data.scrub_types || [])
-    .map(t => `<span class="badge bg-dark border" style="font-size:.68rem;border-color:#30363d!important;">${t.toUpperCase()}</span>`)
-    .join(' ');
-
   const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const tr = document.createElement('tr');
@@ -633,7 +627,7 @@ function insertJobRow(data) {
   tr.innerHTML = `
     <td><span style="color:#3b82f6;font-family:monospace;font-size:.8rem;">${data.job_id}</span></td>
     <td style="max-width:150px;" class="text-truncate" title="${data.filename}">${data.filename}</td>
-    <td>${typeBadges}</td>
+    <td class="text-center job-duration" style="color:#8b949e;font-size:.82rem;white-space:nowrap;">—</td>
     <td class="text-center job-total">—</td>
     <td class="text-center job-clean" style="color:#3fb950;">—</td>
     <td class="text-center job-dnc" style="color:#f85149;">—</td>
@@ -663,9 +657,11 @@ function updateJobRow(data) {
   const row = document.getElementById(`row-${data.job_id}`);
   if (!row) return;
 
-  row.querySelector('.job-total').textContent = data.total ? data.total.toLocaleString() : '—';
-  row.querySelector('.job-clean').textContent = data.clean ? data.clean.toLocaleString() : '—';
-  row.querySelector('.job-dnc').textContent   = data.dnc   ? data.dnc.toLocaleString()   : '—';
+  row.querySelector('.job-total').textContent    = data.total ? data.total.toLocaleString() : '—';
+  row.querySelector('.job-clean').textContent    = data.clean ? data.clean.toLocaleString() : '—';
+  row.querySelector('.job-dnc').textContent      = data.dnc   ? data.dnc.toLocaleString()   : '—';
+  const durCell = row.querySelector('.job-duration');
+  if (durCell) durCell.textContent = data.duration || '—';
 
   // Progress bar (only while processing)
   const statusCell = row.querySelector('.job-status-cell');

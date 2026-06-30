@@ -44,6 +44,7 @@ def job_status(request, job_id):
         'error_message':   job.error_message,
         'result_url':      reverse('scrubber:download_result', args=[job.job_id]) if job.result_file else None,
         'result_url_dnc':  reverse('scrubber:download_result_dnc', args=[job.job_id]) if job.result_file_dnc else None,
+        'duration':        job.duration,
     })
 
 

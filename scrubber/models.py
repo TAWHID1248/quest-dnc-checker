@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 def _generate_scrub_id():
@@ -79,3 +80,28 @@ class ScrubJob(models.Model):
         if self.total == 0:
             return 0
         return round((self.clean / self.total) * 100, 1)
+
+    @property
+    def duration(self) -> str | None:
+        """Human-readable processing duration, e.g. '2m 34s' or '1h 7m'."""
+        _terminal = {
+            self.Status.COMPLETED,
+            self.Status.FAILED,
+            self.Status.CANCELLED,
+            self.Status.PAUSED,
+        }
+        if self.status in _terminal:
+            delta = self.updated_at - self.created_at
+        elif self.status in {self.Status.PROCESSING, self.Status.QUEUED}:
+            delta = timezone.now() - self.created_at
+        else:
+            return None
+        secs = int(delta.total_seconds())
+        if secs < 60:
+            return f"{secs}s"
+        if secs < 3600:
+            m, s = divmod(secs, 60)
+            return f"{m}m {s}s"
+        h, rem = divmod(secs, 3600)
+        m = rem // 60
+        return f"{h}h {m}m"

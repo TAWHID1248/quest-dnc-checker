@@ -168,30 +168,8 @@
         <form id="scrubForm" enctype="multipart/form-data">
           {% csrf_token %}
 
-          <!-- Scrub type selection -->
-          <div class="mb-4">
-            <label class="form-label fw-semibold mb-2" style="color:#8b949e;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;">Scrub Types</label>
-            <div class="row g-2">
-              <div class="col-sm-6">
-                <label class="scrub-check-card d-flex align-items-start gap-3 w-100">
-                  <input type="checkbox" name="scrub_types" value="federal_dnc" class="form-check-input mt-1 flex-shrink-0" checked>
-                  <div>
-                    <div class="check-title"><i class="bi bi-shield-check me-1 text-primary"></i>Federal DNC</div>
-                    <div class="check-sub">National Do Not Call Registry</div>
-                  </div>
-                </label>
-              </div>
-              <div class="col-sm-6">
-                <label class="scrub-check-card d-flex align-items-start gap-3 w-100">
-                  <input type="checkbox" name="scrub_types" value="state_dnc" class="form-check-input mt-1 flex-shrink-0">
-                  <div>
-                    <div class="check-title"><i class="bi bi-geo-alt me-1 text-warning"></i>State DNC</div>
-                    <div class="check-sub">All 50 state registries</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
+          <!-- Scrub type: Federal DNC only -->
+          <input type="hidden" name="scrub_types" value="federal_dnc">
 
           <!-- Drop zone -->
           <div class="mb-3">

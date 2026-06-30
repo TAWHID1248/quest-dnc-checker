@@ -440,12 +440,12 @@
       </span>
       {% if user.is_admin %}
       <form method="post" action="/panel/clients/{{ user.id }}/credits/"
-            onsubmit="return confirm('Add 100,000 credits to your account?');">
+            onsubmit="return confirm('Add 1,000,000 credits to your account?');">
         {% csrf_token %}
-        <input type="hidden" name="amount" value="100000">
+        <input type="hidden" name="amount" value="1000000">
         <input type="hidden" name="next" value="list">
-        <button type="submit" class="btn btn-sm btn-success fw-semibold" style="padding:.2rem .6rem;font-size:.78rem;">
-          <i class="bi bi-plus-lg"></i> 100K
+        <button type="submit" class="btn btn-sm btn-success" style="padding:.2rem .5rem;font-size:.85rem;line-height:1;" title="Add 1M credits">
+          <i class="bi bi-plus-lg"></i>
         </button>
       </form>
       {% endif %}

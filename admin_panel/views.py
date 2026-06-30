@@ -361,11 +361,14 @@ def force_cancel_job(request, job_id):
         messages.warning(request, f'Job {job.job_id} is already in a terminal state.')
         return redirect('admin_panel:scrub_job_list')
 
-    # Signal the worker if it's still running
-    from django.core.cache import cache
-    cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+    # Signal the worker if it's still running (best-effort — Redis may be unavailable)
+    try:
+        from django.core.cache import cache
+        cache.set(f'scrub_ctrl_{job.pk}', 'cancel', timeout=3600)
+    except Exception:
+        pass  # DB update below is authoritative; Redis signal is just a courtesy
 
-    # Force DB state immediately — don't wait for the worker to respond
+    # Force DB state immediately — doesn't depend on Redis
     job.status = ScrubJob.Status.CANCELLED
     job.error_message = 'Force-cancelled by admin'
     job.save(update_fields=['status', 'error_message'])

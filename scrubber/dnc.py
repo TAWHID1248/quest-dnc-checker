@@ -6,6 +6,14 @@ checks concurrently for acceptable throughput on large batches.  Each
 worker thread gets its own requests.Session so TCP connections are reused
 within the thread (significant speedup for large batches).
 
+Pause / cancel support
+----------------------
+An optional threading.Event (stop_event) can be passed to run_checks().
+When the event is set:
+  • _check_one returns None for calls that haven't started yet
+  • already in-flight HTTP calls complete normally (HTTP can't be cancelled)
+  • BatchResult.unchecked contains all numbers that were skipped
+
 Semantics:
     is_dnc = true  →  DNC   (removed from clean list)
     is_dnc = false →  CLEAN
@@ -51,6 +59,7 @@ class BatchResult:
     """Categorised results for one batch of numbers."""
     clean:       list = field(default_factory=list)
     dnc_numbers: list = field(default_factory=list)
+    unchecked:   list = field(default_factory=list)  # skipped due to stop_event
 
     @property
     def clean_count(self) -> int:
@@ -61,8 +70,18 @@ class BatchResult:
         return len(self.dnc_numbers)
 
 
-def _check_one(number: str, api_key: str) -> tuple[str, bool]:
-    """Check a single number. Returns (number, is_dnc). Treats errors as DNC."""
+def _check_one(
+    number: str,
+    api_key: str,
+    stop_event: threading.Event | None = None,
+) -> tuple[str, bool] | None:
+    """
+    Check a single number.
+    Returns (number, is_dnc), or None if stop_event was already set
+    (meaning this number was never sent to the API).
+    """
+    if stop_event and stop_event.is_set():
+        return None  # skipped — will appear in BatchResult.unchecked
     try:
         session = _get_session()
         resp = session.get(
@@ -85,17 +104,22 @@ def _check_one(number: str, api_key: str) -> tuple[str, bool]:
     return number, True  # fail-safe: treat as DNC on any error
 
 
-def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
+def run_checks(
+    numbers: list[str],
+    scrub_types: list[str],
+    stop_event: threading.Event | None = None,
+) -> BatchResult:
     """
     Check each number against the live DNC API.
 
     Args:
         numbers:     List of normalised 10-digit phone strings.
-        scrub_types: Kept for interface compatibility — the external API performs
-                     a unified DNC check regardless of list type.
+        scrub_types: Kept for interface compatibility.
+        stop_event:  When set, queued (not yet started) calls return None and
+                     are collected in BatchResult.unchecked.
 
     Returns:
-        BatchResult where `clean` = not-on-DNC, `dnc_numbers` = DNC matches.
+        BatchResult with clean, dnc_numbers, and unchecked lists.
     """
     if not numbers:
         return BatchResult()
@@ -105,20 +129,25 @@ def run_checks(numbers: list[str], scrub_types: list[str]) -> BatchResult:
         logger.error("DNC_API_KEY not configured — treating all numbers as DNC")
         return BatchResult(dnc_numbers=list(numbers))
 
-    # Default raised to 150 — each thread keeps its own persistent TCP connection
-    # so higher concurrency adds little overhead beyond raw API capacity.
     max_workers = getattr(settings, 'DNC_API_CONCURRENCY', 150)
 
-    clean: list = []
+    clean:       list = []
     dnc_numbers: list = []
+    checked:     set  = set()
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_check_one, n, api_key): n for n in numbers}
+        futures = {executor.submit(_check_one, n, api_key, stop_event): n for n in numbers}
         for future in concurrent.futures.as_completed(futures):
-            number, is_dnc = future.result()
+            result = future.result()
+            if result is None:
+                continue  # this number was skipped; will appear in unchecked below
+            number, is_dnc = result
+            checked.add(number)
             if is_dnc:
                 dnc_numbers.append(number)
             else:
                 clean.append(number)
 
-    return BatchResult(clean=clean, dnc_numbers=dnc_numbers)
+    # Preserve original order for unchecked so resume is deterministic
+    unchecked = [n for n in numbers if n not in checked]
+    return BatchResult(clean=clean, dnc_numbers=dnc_numbers, unchecked=unchecked)

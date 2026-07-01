@@ -26,12 +26,16 @@ A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. 
 
 ```
 quest-dnc-checker/          ← Django project root (manage.py lives here)
-├── accounts/               ← Auth: CustomUser model, login/register/profile views
+├── accounts/               ← Auth: CustomUser model (roles: client/agent/admin), login/register/profile views
+├── agents/                 ← Agent promo code system: AgentPromoCode model, code generation, expiry task
+│   ├── models.py           ← AgentPromoCode (code, sequence, status, expires_at, used_by)
+│   ├── utils.py            ← generate_next_promo_code() — {LAST4}DNC26{NNNN} format
+│   └── tasks.py            ← expire_promo_codes Celery beat task (hourly)
 ├── admin_panel/            ← Internal admin dashboard (client/ticket/payment mgmt)
 ├── api/                    ← Vercel WSGI wrapper (api/index.py)
 ├── billing/                ← Credits, Stripe PaymentIntent/SetupIntent, webhooks
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
-│   ├── dnc.py              ← DNC check logic (federal/state)
+│   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
 │   ├── phone.py            ← Phone normalisation + file parsing
 │   ├── tasks.py            ← process_scrub_job Celery task
 │   ├── views.py            ← scrubber_home + job_status (AJAX) + upload handler
@@ -69,7 +73,14 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 
 ### `accounts.CustomUser`
 Custom auth user. Fields: `email` (login), `name`, `phone`, `company`, `credits` (float),
-`stripe_customer_id`, `role` (CLIENT | ADMIN). Helper: `display_name`, `is_admin`.
+`stripe_customer_id`, `role` (CLIENT | AGENT | ADMIN). Helper: `display_name`, `is_admin`.
+
+### `agents.AgentPromoCode`
+Promo codes for agent referrals. Format: `{LASTNAME4}DNC26{NNNN}` (0001–10000 per agent).
+Fields: `agent` (FK→User), `code`, `sequence`, `status` (active/expired/used), `created_at`,
+`expires_at` (created_at + 7 days), `used_by` (FK→User), `used_at`.
+One ACTIVE code per agent at a time. Hourly beat task `expire_promo_codes` auto-rotates codes.
+Applying a valid code at signup credits the new client with 100,000 credits.
 
 ### `scrubber.ScrubJob`
 One file-scrub request. Fields: `job_id` (SCR-XXXXXXXX), `user`, `filename`, `file`,

@@ -28,6 +28,15 @@ class RegisterForm(UserCreationForm):
     company = forms.CharField(max_length=150, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     password1 = forms.CharField(label='Password', widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     password2 = forms.CharField(label='Confirm Password', widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    promo_code = forms.CharField(
+        label='Promo Code',
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-uppercase',
+            'placeholder': 'Optional — enter agent promo code',
+        }),
+    )
 
     class Meta:
         model = CustomUser

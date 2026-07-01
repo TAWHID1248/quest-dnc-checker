@@ -23,6 +23,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         CLIENT = 'client', 'Client'
+        AGENT = 'agent', 'Agent'
         ADMIN = 'admin', 'Admin'
 
     email = models.EmailField(unique=True)

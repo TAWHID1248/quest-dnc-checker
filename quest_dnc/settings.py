@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     # Local apps
     'accounts',
+    'agents',
     'scrubber',
     'billing',
     'support',
@@ -150,6 +151,14 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 CELERY_RESULT_EXTENDED = True
 
+from celery.schedules import crontab  # noqa: E402
+CELERY_BEAT_SCHEDULE = {
+    'expire-promo-codes-hourly': {
+        'task': 'agents.tasks.expire_promo_codes',
+        'schedule': crontab(minute=0),  # top of every hour
+    },
+}
+
 # Cache
 CACHES = {
     'default': {
@@ -267,6 +276,11 @@ LOGGING = {
             'propagate': False,
         },
         'dnc_master': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'agents': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

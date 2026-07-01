@@ -2,8 +2,10 @@ from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Sum, Count, Q
 from django.shortcuts import render, redirect
+from django.utils import timezone
 
 from billing.models import CreditTransaction, PaymentMethod
 from scrubber.models import ScrubJob
@@ -25,9 +27,50 @@ def register_view(request):
         return redirect('dashboard')
     form = RegisterForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        user = form.save()
+        promo_code_str = form.cleaned_data.get('promo_code', '').strip().upper()
+        promo_code_obj = None
+
+        if promo_code_str:
+            from agents.models import AgentPromoCode
+            try:
+                promo_code_obj = AgentPromoCode.objects.select_related('agent').get(
+                    code=promo_code_str,
+                    status=AgentPromoCode.Status.ACTIVE,
+                )
+                if promo_code_obj.expires_at < timezone.now():
+                    promo_code_obj.status = AgentPromoCode.Status.EXPIRED
+                    promo_code_obj.save(update_fields=['status'])
+                    promo_code_obj = None
+                    form.add_error('promo_code', 'This promo code has expired. Please request a new one from your agent.')
+                    return render(request, 'accounts/register.html', {'form': form})
+            except AgentPromoCode.DoesNotExist:
+                form.add_error('promo_code', 'Invalid promo code. Please check and try again.')
+                return render(request, 'accounts/register.html', {'form': form})
+
+        with transaction.atomic():
+            user = form.save()
+            if promo_code_obj:
+                user.credits += 100_000
+                user.save(update_fields=['credits'])
+                CreditTransaction.objects.create(
+                    user=user,
+                    type=CreditTransaction.Type.ADJUSTMENT,
+                    amount=100_000,
+                    price=0,
+                )
+                promo_code_obj.status = AgentPromoCode.Status.USED
+                promo_code_obj.used_by = user
+                promo_code_obj.used_at = timezone.now()
+                promo_code_obj.save(update_fields=['status', 'used_by', 'used_at'])
+
+        if promo_code_obj:
+            from agents.utils import generate_next_promo_code
+            generate_next_promo_code(promo_code_obj.agent)
+            messages.success(request, 'Account created! 100,000 credits have been added to your account.')
+        else:
+            messages.success(request, 'Account created successfully.')
+
         login(request, user)
-        messages.success(request, 'Account created successfully.')
         return redirect('dashboard')
     return render(request, 'accounts/register.html', {'form': form})
 

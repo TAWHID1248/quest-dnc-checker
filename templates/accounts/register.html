@@ -22,8 +22,12 @@
 <form method="post" novalidate>
   {% csrf_token %}
   {% for field in form %}
+  {% if field.name == 'promo_code' %}
+  <hr class="my-3" style="border-color:#30363d;">
+  <p class="mb-2" style="color:#6e7681;font-size:.8rem;">Have an agent promo code? Enter it below to receive 100,000 free credits.</p>
+  {% endif %}
   <div class="mb-3">
-    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}{% if not field.field.required %} <span style="color:#6e7681;font-size:.75rem;">(optional)</span>{% endif %}</label>
     {{ field }}
     {% if field.errors %}
       <div class="text-danger mt-1" style="font-size:0.8rem;">{{ field.errors.0 }}</div>

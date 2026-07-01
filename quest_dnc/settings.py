@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,.railway.app,0.0.0.0,127.0.0.1').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,.railway.app,0.0.0.0,127.0.0.1,checkdnc.net,.checkdnc.net').split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -186,7 +186,7 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@checkdnc.net'
 # CSRF / Security — trust Railway and custom domains
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
-    default='https://*.railway.app',
+    default='https://*.railway.app,https://checkdnc.net,https://www.checkdnc.net',
 ).split(',')
 
 # Railway (and most PaaS) terminate SSL at the edge

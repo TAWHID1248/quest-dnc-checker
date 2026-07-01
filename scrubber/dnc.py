@@ -77,9 +77,15 @@ def _bulk_cache_lookup(numbers: list[str]) -> tuple[dict[str, bool], list[str]]:
     Single Redis MGET for all numbers.
     Returns (cached_results, uncached_numbers).
     cached_results maps number -> is_dnc for cache hits.
+    Falls back to (empty, all numbers) on any Redis error so the job
+    continues without caching rather than failing.
     """
-    keys = [_cache_key(n) for n in numbers]
-    values = cache.get_many(keys)
+    try:
+        keys = [_cache_key(n) for n in numbers]
+        values = cache.get_many(keys)
+    except Exception as exc:
+        logger.warning("DNC result cache unavailable (lookup): %s — skipping cache", exc)
+        return {}, list(numbers)
 
     cached: dict[str, bool] = {}
     uncached: list[str] = []
@@ -93,13 +99,17 @@ def _bulk_cache_lookup(numbers: list[str]) -> tuple[dict[str, bool], list[str]]:
 
 
 def _bulk_cache_store(results: dict[str, bool]) -> None:
-    """Store confirmed API results in Redis with a single MSET call."""
+    """Store confirmed API results in Redis with a single MSET call.
+    Failures are logged and ignored — caching is best-effort."""
     if not results:
         return
-    cache.set_many(
-        {_cache_key(n): is_dnc for n, is_dnc in results.items()},
-        DNC_RESULT_CACHE_TTL,
-    )
+    try:
+        cache.set_many(
+            {_cache_key(n): is_dnc for n, is_dnc in results.items()},
+            DNC_RESULT_CACHE_TTL,
+        )
+    except Exception as exc:
+        logger.warning("DNC result cache unavailable (store): %s — skipping cache", exc)
 
 
 @dataclass

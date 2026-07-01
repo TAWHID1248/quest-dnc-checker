@@ -5,6 +5,7 @@ app_name = 'scrubber'
 
 urlpatterns = [
     path('', views.scrubber_home, name='home'),
+    path('presign/', views.presign_upload, name='presign_upload'),
     path('status/<str:job_id>/', views.job_status, name='job_status'),
     path('control/<str:job_id>/', views.job_control, name='job_control'),
     path('download/<str:job_id>/', views.download_result, name='download_result'),

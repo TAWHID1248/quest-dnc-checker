@@ -505,12 +505,12 @@ dropZone.addEventListener('drop', e => {
 dropZone.addEventListener('click', () => fileInput.click());
 
 // ── AJAX upload with progress bar ─────────────────────────────────────
-const scrubForm     = document.getElementById('scrubForm');
+const scrubForm      = document.getElementById('scrubForm');
 const uploadProgress = document.getElementById('uploadProgress');
-const progressBar   = document.getElementById('progressBar');
-const progressLabel = document.getElementById('progressLabel');
-const progressPct   = document.getElementById('progressPct');
-const uploadError   = document.getElementById('uploadError');
+const progressBar    = document.getElementById('progressBar');
+const progressLabel  = document.getElementById('progressLabel');
+const progressPct    = document.getElementById('progressPct');
+const uploadError    = document.getElementById('uploadError');
 
 function setProgress(pct, label) {
   progressBar.style.width = pct + '%';
@@ -526,50 +526,108 @@ function showUploadError(msg) {
   submitBtn.disabled = false;
 }
 
-scrubForm.addEventListener('submit', function(e) {
-  e.preventDefault();
-  uploadError.classList.add('d-none');
-  uploadProgress.classList.remove('d-none');
-  submitBtn.disabled = true;
-  setProgress(0, 'Uploading...');
+function notifyDjango(fileKey, originalFilename) {
+  /* After a successful S3 presigned PUT, tell Django about the uploaded file. */
+  setProgress(100, 'Registering job…');
+  const formData = new FormData(scrubForm);
+  formData.delete('file');
+  formData.append('file_key', fileKey);
+  formData.append('original_filename', originalFilename);
 
-  const formData = new FormData(this);
   const xhr = new XMLHttpRequest();
-
-  xhr.upload.addEventListener('progress', function(e) {
-    if (e.lengthComputable) {
-      const pct = Math.round((e.loaded / e.total) * 100);
-      setProgress(pct, 'Uploading...');
-    }
-  });
-
   xhr.addEventListener('load', function() {
     let data;
-    try { data = JSON.parse(xhr.responseText); } catch(err) {
-      showUploadError('Unexpected server response. Please try again.');
+    try { data = JSON.parse(xhr.responseText); } catch(_) {
+      showUploadError(`Server error (HTTP ${xhr.status}). Please try again.`);
       return;
     }
     if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
-      setProgress(100, 'Queued — processing...');
-      // Reset the form for the next upload
-      clearFile();
-      scrubForm.reset();
-      setTimeout(() => { uploadProgress.classList.add('d-none'); submitBtn.disabled = true; }, 1500);
-      // Insert a new row into the jobs table and start polling
-      insertJobRow(data);
-      startPolling(data.job_id);
+      onJobQueued(data);
+    } else {
+      showUploadError(data.error || 'Failed to register job. Please try again.');
+    }
+  });
+  xhr.addEventListener('error', () => showUploadError('Network error. Please try again.'));
+  xhr.open('POST', window.location.pathname);
+  xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+  xhr.send(formData);
+}
+
+function doDirectUpload(formData) {
+  /* Fallback: upload file directly to Django (works for local dev / small files). */
+  const xhr = new XMLHttpRequest();
+  xhr.upload.addEventListener('progress', function(e) {
+    if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100), 'Uploading…');
+  });
+  xhr.addEventListener('load', function() {
+    let data;
+    try { data = JSON.parse(xhr.responseText); } catch(_) {
+      showUploadError(`Server error (HTTP ${xhr.status}). The file may be too large for direct upload — please try again or contact support.`);
+      return;
+    }
+    if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+      onJobQueued(data);
     } else {
       showUploadError(data.error || 'Upload failed. Please try again.');
     }
   });
-
-  xhr.addEventListener('error', function() {
-    showUploadError('Network error. Please check your connection and try again.');
-  });
-
+  xhr.addEventListener('error', () => showUploadError('Network error. Please check your connection and try again.'));
   xhr.open('POST', window.location.pathname);
   xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
   xhr.send(formData);
+}
+
+function onJobQueued(data) {
+  setProgress(100, 'Queued — processing…');
+  clearFile();
+  scrubForm.reset();
+  setTimeout(() => { uploadProgress.classList.add('d-none'); submitBtn.disabled = true; }, 1500);
+  insertJobRow(data);
+  startPolling(data.job_id);
+}
+
+scrubForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  uploadError.classList.add('d-none');
+  uploadProgress.classList.remove('d-none');
+  submitBtn.disabled = true;
+  setProgress(0, 'Preparing upload…');
+
+  const file = fileInput.files[0];
+  if (!file) { showUploadError('Please select a file.'); return; }
+
+  // ── Try presigned S3 PUT (bypasses Railway proxy for large files) ────
+  let presign = null;
+  try {
+    const resp = await fetch(`/scrubber/presign/?filename=${encodeURIComponent(file.name)}`);
+    if (resp.ok) {
+      const j = await resp.json();
+      if (j.ok) presign = j;
+    }
+  } catch (_) { /* no S3 — fall through to direct upload */ }
+
+  if (presign) {
+    // Upload directly to S3 via presigned PUT URL
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', function(ev) {
+      if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 98), 'Uploading to S3…');
+    });
+    xhr.addEventListener('load', function() {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        notifyDjango(presign.key, file.name);
+      } else {
+        showUploadError(`S3 upload failed (HTTP ${xhr.status}). Please try again.`);
+      }
+    });
+    xhr.addEventListener('error', () => showUploadError('Network error during upload. Please try again.'));
+    xhr.open('PUT', presign.put_url);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.send(file);
+  } else {
+    // Fallback: direct upload to Django
+    setProgress(0, 'Uploading…');
+    doDirectUpload(new FormData(scrubForm));
+  }
 });
 
 // ── Jobs table helpers ────────────────────────────────────────────────

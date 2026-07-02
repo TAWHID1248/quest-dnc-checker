@@ -59,8 +59,8 @@ def _get_session() -> requests.Session:
         session = requests.Session()
         adapter = HTTPAdapter(
             pool_connections=1,
-            pool_maxsize=2,
-            max_retries=Retry(total=1, backoff_factor=0.5, status_forcelist=[500, 502, 503]),
+            pool_maxsize=1,
+            max_retries=Retry(total=0),  # no retries — treat errors as DNC and move on
         )
         session.mount('https://', adapter)
         session.mount('http://', adapter)
@@ -149,7 +149,7 @@ def _check_one(
             DNC_API_URL,
             params={'phone': number},
             headers={'X-API-KEY': api_key},
-            timeout=15,
+            timeout=8,
         )
         if resp.status_code == 200:
             data = resp.json()

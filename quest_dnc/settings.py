@@ -194,11 +194,12 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Scrubber
 SCRUB_BATCH_SIZE = 300_000          # numbers per DNC-check batch
+SCRUB_CONTROL_CHECK_SIZE = 50_000   # chunk size for pause/cancel checks (was 10k)
 SCRUB_MAX_FILE_SIZE_MB = 200        # upload cap shown in UI
 
 # DNC API
 DNC_API_KEY         = config('DNC_API_KEY', default='')
-DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=50, cast=int)
+DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=500, cast=int)
 
 # Stripe
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')

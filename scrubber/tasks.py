@@ -199,7 +199,7 @@ def _send_completion_email(job: ScrubJob) -> None:
         f"  Clean:          {job.clean:,} ({clean_rate}%)\n"
         f"  DNC:            {job.dnc:,}\n\n"
         f"Log in to download your results:\n"
-        f"https://checkdnc.net/scrubber/\n\n"
+        f"https://app.checkdnc.net/scrubber/\n\n"
         f"— The CheckDNC Team"
     )
     send_mail(

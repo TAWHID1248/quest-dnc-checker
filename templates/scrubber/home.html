@@ -586,6 +586,10 @@ function onJobQueued(data) {
   startPolling(data.job_id);
 }
 
+// Files larger than this go via presigned S3 PUT to bypass Railway's proxy.
+// Files at or below this threshold upload directly to Django (simpler, no CORS needed).
+const S3_THRESHOLD = 80 * 1024 * 1024; // 80 MB
+
 scrubForm.addEventListener('submit', async function(e) {
   e.preventDefault();
   uploadError.classList.add('d-none');
@@ -596,7 +600,14 @@ scrubForm.addEventListener('submit', async function(e) {
   const file = fileInput.files[0];
   if (!file) { showUploadError('Please select a file.'); return; }
 
-  // ── Try presigned S3 PUT (bypasses Railway proxy for large files) ────
+  // Small files go direct — no S3/CORS complexity needed.
+  if (file.size <= S3_THRESHOLD) {
+    setProgress(0, 'Uploading…');
+    doDirectUpload(new FormData(scrubForm));
+    return;
+  }
+
+  // ── Large file: try presigned S3 PUT (bypasses Railway proxy) ────────
   let presign = null;
   try {
     const resp = await fetch(`/scrubber/presign/?filename=${encodeURIComponent(file.name)}`);
@@ -604,10 +615,9 @@ scrubForm.addEventListener('submit', async function(e) {
       const j = await resp.json();
       if (j.ok) presign = j;
     }
-  } catch (_) { /* no S3 — fall through to direct upload */ }
+  } catch (_) { /* S3 not available — fall through */ }
 
   if (presign) {
-    // Upload directly to S3 via presigned PUT URL
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener('progress', function(ev) {
       if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 98), 'Uploading to S3…');
@@ -619,12 +629,16 @@ scrubForm.addEventListener('submit', async function(e) {
         showUploadError(`S3 upload failed (HTTP ${xhr.status}). Please try again.`);
       }
     });
-    xhr.addEventListener('error', () => showUploadError('Network error during upload. Please try again.'));
+    xhr.addEventListener('error', function() {
+      // S3 PUT blocked (likely missing CORS rule) — fall back to direct upload.
+      setProgress(0, 'Uploading…');
+      doDirectUpload(new FormData(scrubForm));
+    });
     xhr.open('PUT', presign.put_url);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.send(file);
   } else {
-    // Fallback: direct upload to Django
+    // S3 not configured — direct upload.
     setProgress(0, 'Uploading…');
     doDirectUpload(new FormData(scrubForm));
   }

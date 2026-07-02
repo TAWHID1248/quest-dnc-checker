@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "celery -A quest_dnc beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

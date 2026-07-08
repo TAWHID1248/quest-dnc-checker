@@ -214,7 +214,8 @@ def _handle_upload(request, recent_jobs):
     if request.user.credits <= 0:
         return _error(
             'You have no credits remaining. '
-            '<a href="/billing/" class="alert-link">Buy credits</a> to continue.'
+            '<a href="#" class="alert-link" onclick="openWhatsAppPopup();return false;">'
+            'Contact us on WhatsApp</a> to buy credits.'
         )
 
     # ── Determine upload mode ────────────────────────────────────────────

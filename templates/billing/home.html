@@ -21,26 +21,27 @@
   .tier-features li:last-child { border-bottom:none; }
   .tier-features li i { color:#3fb950; flex-shrink:0; }
 
-  /* Stripe card element */
-  #card-element {
-    background:#161b22; border:1px solid #30363d; border-radius:8px;
-    padding:.85rem 1rem; transition:border-color .15s;
+  /* WhatsApp purchase modal */
+  .wa-number-box {
+    display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+    background:#161b22; border:1px solid #30363d; border-radius:10px;
+    padding:.85rem 1rem;
   }
-  #card-element.StripeElement--focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
-  #card-element.StripeElement--invalid { border-color:#f85149; }
-
-  /* Payment state UI */
-  .pay-state { display:none; }
-  .pay-state.active { display:block; }
-  #payment-processing { text-align:center; padding:1.5rem 0; }
-  #payment-success    { text-align:center; padding:1rem 0; }
-  #payment-error-msg  { font-size:.82rem; color:#f85149; margin-top:.5rem; min-height:1.2em; }
-
-  #pay-btn { position:relative; }
-  #pay-btn .spinner { display:none; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; }
-  #pay-btn.loading .btn-label { display:none; }
-  #pay-btn.loading .spinner { display:inline-block; }
-  @keyframes spin { to { transform:rotate(360deg); } }
+  .wa-number {
+    font-family:monospace; font-size:1.15rem; font-weight:700; color:#e6edf3;
+    letter-spacing:.03em; user-select:all;
+  }
+  .btn-copy-wa {
+    border:1px solid #30363d; background:#21262d; color:#8b949e;
+    border-radius:8px; padding:.35rem .7rem; font-size:.8rem; font-weight:600;
+    transition:all .15s; white-space:nowrap;
+  }
+  .btn-copy-wa:hover { border-color:#3b82f6; color:#e6edf3; }
+  .btn-copy-wa.copied { border-color:#3fb950; color:#3fb950; background:#1a3a2a; }
+  .btn-whatsapp {
+    background:#25d366; border:none; color:#0d1117; font-weight:700;
+  }
+  .btn-whatsapp:hover { background:#1fb457; color:#0d1117; }
 </style>
 {% endblock %}
 
@@ -156,53 +157,28 @@
           <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
 
-        <!-- ── State: payment form ─────────────────── -->
-        <div class="pay-state active" id="state-form">
-          <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">Card Details</label>
-          <div id="card-element"></div>
-          <div id="payment-error-msg"></div>
+        <!-- ── WhatsApp purchase ─────────────────── -->
+        <p class="mb-3" style="color:#8b949e;font-size:.875rem;">
+          To purchase this plan, contact us on WhatsApp. Send us your account email
+          and the plan you want — we'll add the credits to your account after payment.
+        </p>
 
-          <div class="mt-3 mb-4 p-3 rounded d-flex align-items-center gap-2" style="background:#161b22;border:1px solid #21262d;font-size:.78rem;color:#6e7681;">
-            <i class="bi bi-lock-fill" style="color:#3b82f6;font-size:.9rem;flex-shrink:0;"></i>
-            Payments processed securely by Stripe. We never store your card number.
-          </div>
-
-          <button id="pay-btn" class="btn btn-primary w-100 fw-semibold py-2" type="button">
-            <span class="btn-label"><i class="bi bi-lock-fill me-1"></i>Pay <span id="pay-btn-amount"></span></span>
-            <span class="spinner mx-auto"></span>
+        <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">WhatsApp Number</label>
+        <div class="wa-number-box mb-3">
+          <span class="wa-number" id="wa-number-text">+1 423 432 7902</span>
+          <button class="btn-copy-wa" type="button" id="copy-wa-btn" onclick="copyWaNumber()">
+            <i class="bi bi-clipboard me-1"></i><span id="copy-wa-label">Copy</span>
           </button>
         </div>
 
-        <!-- ── State: processing ───────────────────── -->
-        <div class="pay-state" id="state-processing">
-          <div id="payment-processing">
-            <div class="spinner-border text-primary mb-3" role="status" style="width:2.5rem;height:2.5rem;"></div>
-            <div style="color:#8b949e;font-size:.9rem;">Processing your payment…</div>
-          </div>
-        </div>
+        <a id="wa-chat-btn" class="btn btn-whatsapp w-100 fw-semibold py-2" href="#" target="_blank" rel="noopener">
+          <i class="bi bi-whatsapp me-2"></i>Chat on WhatsApp
+        </a>
 
-        <!-- ── State: success ─────────────────────── -->
-        <div class="pay-state" id="state-success">
-          <div id="payment-success">
-            <div class="mb-3" style="font-size:3rem;">✅</div>
-            <h6 class="fw-bold mb-1" style="color:#e6edf3;">Payment Successful!</h6>
-            <p style="color:#6e7681;font-size:.875rem;" id="success-msg"></p>
-            <button class="btn btn-outline-success w-100 mt-2" onclick="location.reload()">
-              <i class="bi bi-arrow-clockwise me-1"></i>Refresh Balance
-            </button>
-          </div>
-        </div>
-
-        <!-- ── State: error ───────────────────────── -->
-        <div class="pay-state" id="state-error">
-          <div class="text-center py-3">
-            <div class="mb-3" style="font-size:2.5rem;">❌</div>
-            <h6 class="fw-bold mb-1" style="color:#f85149;">Payment Failed</h6>
-            <p id="error-detail" style="color:#8b949e;font-size:.85rem;"></p>
-            <button class="btn btn-outline-secondary w-100 mt-2" id="retry-btn">
-              <i class="bi bi-arrow-counterclockwise me-1"></i>Try Again
-            </button>
-          </div>
+        <div class="mt-3 p-3 rounded d-flex align-items-center gap-2" style="background:#161b22;border:1px solid #21262d;font-size:.78rem;color:#6e7681;">
+          <i class="bi bi-info-circle-fill" style="color:#3b82f6;font-size:.9rem;flex-shrink:0;"></i>
+          Include your account email <strong style="color:#8b949e;">{{ user.email }}</strong> in your
+          message so we can credit the right account.
         </div>
 
       </div>
@@ -212,31 +188,31 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://js.stripe.com/v3/"></script>
 <script>
-  var STRIPE_CONFIG_URL    = '{% url "billing:stripe_config" %}';
-  var CREATE_PI_URL        = '{% url "billing:create_payment_intent" %}';
-  var PAYMENT_COMPLETE_URL = '{% url "billing:payment_complete" %}';
-  var CSRF_TOKEN           = '{{ csrf_token }}';
-  var stripeObj         = null;
-  var cardElement       = null;
-  var currentTier       = null;
+  var WA_NUMBER  = '14234327902';           /* wa.me format: no "+" */
+  var USER_EMAIL = '{{ user.email|escapejs }}';
 
   /* ── Open modal (pure JS, no Bootstrap.Modal dependency) ── */
   function openPurchaseModal(btn) {
-    currentTier = {
+    var tier = {
       name:    btn.getAttribute('data-tier'),
       price:   btn.getAttribute('data-price'),
       credits: btn.getAttribute('data-credits'),
     };
 
-    document.getElementById('modal-tier-name').textContent = currentTier.name + ' Plan';
-    document.getElementById('modal-credits').textContent   = currentTier.credits;
-    document.getElementById('modal-price').textContent     = '$' + currentTier.price;
-    document.getElementById('pay-btn-amount').textContent  = '$' + currentTier.price;
-    document.getElementById('payment-error-msg').textContent = '';
-    document.getElementById('pay-btn').disabled = false;
-    showState('form');
+    document.getElementById('modal-tier-name').textContent = tier.name + ' Plan';
+    document.getElementById('modal-credits').textContent   = tier.credits;
+    document.getElementById('modal-price').textContent     = '$' + tier.price;
+
+    var msg = 'Hi! I want to buy the ' + tier.name + ' plan (' + tier.credits +
+              ' credits) for $' + tier.price + '. My account email: ' + USER_EMAIL;
+    document.getElementById('wa-chat-btn').href =
+      'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
+
+    /* reset copy button */
+    var cb = document.getElementById('copy-wa-btn');
+    cb.classList.remove('copied');
+    document.getElementById('copy-wa-label').textContent = 'Copy';
 
     /* show the modal div manually */
     var m = document.getElementById('purchaseModal');
@@ -254,8 +230,6 @@
       document.body.appendChild(bd);
     }
     setTimeout(function(){ bd.classList.add('show'); }, 10);
-
-    mountCard();
   }
 
   function closePurchaseModal() {
@@ -269,126 +243,38 @@
       document.body.style.overflow = '';
       if (bd) bd.remove();
     }, 200);
-    if (cardElement) { cardElement.destroy(); cardElement = null; }
-    stripeObj = null;
   }
 
-  /* ── Mount Stripe card element (fetches PK live from server) ── */
-  function mountCard() {
-    var el = document.getElementById('card-element');
-    el.innerHTML = '<div style="color:#6e7681;font-size:.82rem;padding:.5rem 0;">Loading card form…</div>';
-
-    if (typeof Stripe !== 'function') {
-      return showCardError('Stripe.js could not load. Check your internet connection and refresh.');
+  /* ── Copy WhatsApp number ── */
+  function copyWaNumber() {
+    var num = '+' + WA_NUMBER;
+    var done = function() {
+      var cb = document.getElementById('copy-wa-btn');
+      cb.classList.add('copied');
+      document.getElementById('copy-wa-label').textContent = 'Copied!';
+      setTimeout(function() {
+        cb.classList.remove('copied');
+        document.getElementById('copy-wa-label').textContent = 'Copy';
+      }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(num).then(done).catch(function(){ fallbackCopy(num, done); });
+    } else {
+      fallbackCopy(num, done);
     }
-
-    fetch(STRIPE_CONFIG_URL)
-      .then(function(r) { return r.json(); })
-      .then(function(cfg) {
-        var pk = cfg.publishable_key;
-        if (!pk || !pk.startsWith('pk_')) {
-          return showCardError('Stripe key not configured on the server.');
-        }
-        try {
-          stripeObj    = Stripe(pk);
-          var elements = stripeObj.elements();
-          cardElement  = elements.create('card', {
-            style: {
-              base: {
-                color: '#e6edf3', fontSize: '15px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-                '::placeholder': { color: '#6e7681' },
-                iconColor: '#6e7681',
-              },
-              invalid: { color: '#f85149', iconColor: '#f85149' },
-            },
-            hidePostalCode: true,
-          });
-          el.innerHTML = '';
-          cardElement.mount('#card-element');
-          cardElement.on('change', function(e) {
-            document.getElementById('payment-error-msg').textContent = e.error ? e.error.message : '';
-          });
-        } catch(err) {
-          showCardError('Card form error: ' + err.message);
-        }
-      })
-      .catch(function(err) {
-        showCardError('Could not reach server: ' + err.message);
-      });
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch(e) {}
+    document.body.removeChild(ta);
   }
 
-  /* ── Pay button ── */
   document.addEventListener('DOMContentLoaded', function() {
-
-    document.getElementById('pay-btn').addEventListener('click', async function() {
-      if (!stripeObj || !cardElement || !currentTier) return;
-      setPayBtnLoading(true);
-      document.getElementById('payment-error-msg').textContent = '';
-      try {
-        var res  = await fetch(CREATE_PI_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-          body: JSON.stringify({ tier: currentTier.name }),
-        });
-        var data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || 'Server error HTTP ' + res.status);
-
-        showState('processing');
-        var result = await stripeObj.confirmCardPayment(data.client_secret, {
-          payment_method: { card: cardElement },
-        });
-        if (result.error) throw new Error(result.error.message);
-        if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
-          // Notify the server to credit the account immediately
-          var completeRes = await fetch(PAYMENT_COMPLETE_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-            body: JSON.stringify({ payment_intent_id: result.paymentIntent.id }),
-          });
-          var completeData = await completeRes.json();
-          if (!completeRes.ok || completeData.error) throw new Error(completeData.error || 'Failed to apply credits.');
-
-          showState('success');
-          var newBalance = completeData.credits !== undefined
-            ? Number(completeData.credits).toLocaleString() + ' credits'
-            : currentTier.credits + ' credits';
-          document.getElementById('success-msg').textContent =
-            currentTier.credits + ' credits added! New balance: ' + newBalance + '.';
-        } else {
-          throw new Error('Unexpected status: ' + (result.paymentIntent ? result.paymentIntent.status : '?'));
-        }
-      } catch(err) {
-        showState('error');
-        document.getElementById('error-detail').textContent = err.message;
-        setPayBtnLoading(false);
-      }
-    });
-
-    document.getElementById('retry-btn').addEventListener('click', function() {
-      showState('form'); setPayBtnLoading(false);
-    });
-
     document.getElementById('modal-close-btn').addEventListener('click', closePurchaseModal);
   });
-
-  /* ── Helpers ── */
-  function showState(name) {
-    ['form','processing','success','error'].forEach(function(s) {
-      document.getElementById('state-' + s).classList.toggle('active', s === name);
-    });
-    document.getElementById('modal-close-btn').style.display = name === 'processing' ? 'none' : '';
-  }
-  function setPayBtnLoading(on) {
-    var b = document.getElementById('pay-btn');
-    b.classList.toggle('loading', on);
-    b.disabled = on;
-  }
-  function showCardError(msg) {
-    document.getElementById('card-element').innerHTML =
-      '<div style="color:#f85149;font-size:.82rem;padding:.5rem 0;">' +
-      '<i class="bi bi-exclamation-triangle me-1"></i>' + msg + '</div>';
-    document.getElementById('pay-btn').disabled = true;
-  }
 </script>
 {% endblock %}

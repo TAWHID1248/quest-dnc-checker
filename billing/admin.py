@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PaymentMethod, CreditTransaction, Payment
+from .models import PaymentMethod, CreditTransaction, Invoice, Payment
 
 
 @admin.register(PaymentMethod)
@@ -15,6 +15,15 @@ class CreditTransactionAdmin(admin.ModelAdmin):
     list_filter = ('type', 'created_at')
     search_fields = ('transaction_id', 'user__email')
     readonly_fields = ('transaction_id', 'created_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ('invoice_number', 'user', 'credits', 'amount', 'issued_by', 'email_sent', 'created_at')
+    list_filter = ('email_sent', 'created_at')
+    search_fields = ('invoice_number', 'user__email')
+    readonly_fields = ('invoice_number', 'created_at')
     ordering = ('-created_at',)
 
 

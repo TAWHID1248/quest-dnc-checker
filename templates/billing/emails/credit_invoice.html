@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice {{ invoice.invoice_number }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f5f7; font-family:Arial, Helvetica, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; max-width:600px; width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#0d1117; padding:28px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="color:#ffffff; font-size:20px; font-weight:bold;">CheckDNC</td>
+                  <td align="right" style="color:#8b949e; font-size:13px;">INVOICE</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Intro -->
+          <tr>
+            <td style="padding:32px 32px 8px;">
+              <p style="margin:0 0 8px; font-size:16px; color:#1f2328;">Hello {{ user.display_name }},</p>
+              <p style="margin:0; font-size:14px; color:#57606a; line-height:1.6;">
+                Credits have been added to your CheckDNC account. Your invoice details are below.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Invoice meta -->
+          <tr>
+            <td style="padding:24px 32px 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #d0d7de; border-radius:6px;">
+                <tr>
+                  <td style="padding:16px 20px; border-bottom:1px solid #d0d7de;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="font-size:13px; color:#57606a;">Invoice #</td>
+                        <td align="right" style="font-size:13px; color:#1f2328; font-weight:bold;">{{ invoice.invoice_number }}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:13px; color:#57606a; padding-top:6px;">Date</td>
+                        <td align="right" style="font-size:13px; color:#1f2328; padding-top:6px;">{{ invoice.created_at|date:"M d, Y" }}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:13px; color:#57606a; padding-top:6px;">Billed to</td>
+                        <td align="right" style="font-size:13px; color:#1f2328; padding-top:6px;">{{ user.email }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="font-size:13px; color:#57606a; padding-bottom:8px; border-bottom:1px solid #d0d7de;">Description</td>
+                        <td align="right" style="font-size:13px; color:#57606a; padding-bottom:8px; border-bottom:1px solid #d0d7de;">Amount</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:14px; color:#1f2328; padding-top:12px;">
+                          DNC scrubbing credits — {{ credits_display }} credits
+                          {% if invoice.notes %}<br><span style="font-size:12px; color:#57606a;">{{ invoice.notes }}</span>{% endif %}
+                        </td>
+                        <td align="right" style="font-size:14px; color:#1f2328; padding-top:12px;">${{ amount_display }}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:14px; color:#1f2328; font-weight:bold; padding-top:16px;">Total</td>
+                        <td align="right" style="font-size:16px; color:#1f2328; font-weight:bold; padding-top:16px;">${{ amount_display }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Balance -->
+          <tr>
+            <td style="padding:20px 32px 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#dafbe1; border-radius:6px;">
+                <tr>
+                  <td style="padding:14px 20px; font-size:14px; color:#116329;">
+                    New credit balance: <strong>{{ balance_display }} credits</strong>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td align="center" style="padding:28px 32px;">
+              <a href="https://app.checkdnc.net/scrubber/"
+                 style="display:inline-block; background-color:#238636; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold; padding:12px 28px; border-radius:6px;">
+                Start Scrubbing
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 32px 28px; border-top:1px solid #d0d7de;">
+              <p style="margin:0; font-size:12px; color:#8b949e; line-height:1.6;">
+                This invoice was generated automatically when credits were added to your account.
+                If you have any questions, reply to this email or open a support ticket from your dashboard.
+                <br><br>— The CheckDNC Team
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

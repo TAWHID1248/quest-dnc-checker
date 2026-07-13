@@ -276,6 +276,11 @@
           </div>
           <label class="form-label" style="font-size:.85rem;color:#8b949e;">Amount (use negative to deduct)</label>
           <input type="number" name="amount" class="form-control" placeholder="e.g. 1000 or -500" required>
+          <label class="form-label mt-3" style="font-size:.85rem;color:#8b949e;">Note (optional, shown on invoice)</label>
+          <input type="text" name="notes" class="form-control" maxlength="255" placeholder="e.g. Promotional credit">
+          <div class="mt-2" style="font-size:.75rem;color:#6e7681;">
+            Adding credits emails an invoice to the client automatically.
+          </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid #21262d;">
           <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

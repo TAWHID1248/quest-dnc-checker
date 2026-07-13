@@ -92,6 +92,50 @@ class CreditTransaction(models.Model):
         super().save(*args, **kwargs)
 
 
+class Invoice(models.Model):
+    """Invoice issued to a user when credits are granted by an admin."""
+
+    invoice_number = models.CharField(max_length=20, unique=True, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='invoices',
+    )
+    transaction = models.OneToOneField(
+        CreditTransaction,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='invoice',
+    )
+    credits = models.DecimalField(max_digits=10, decimal_places=2, help_text='Credits granted')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='USD amount billed, if applicable')
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='invoices_issued',
+    )
+    notes = models.CharField(max_length=255, blank=True)
+    email_sent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['invoice_number']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.invoice_number} — {self.credits} credits (${self.amount}) for {self.user.email}"
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            self.invoice_number = _generate_id('INV')
+        super().save(*args, **kwargs)
+
+
 class Payment(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'

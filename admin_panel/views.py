@@ -9,7 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from billing.models import CreditTransaction, Payment, PaymentMethod
+from billing.emails import send_credit_invoice_email
+from billing.models import CreditTransaction, Invoice, Payment, PaymentMethod
 from scrubber.models import ScrubJob
 from support.models import SupportTicket
 from .decorators import admin_required
@@ -148,13 +149,32 @@ def client_adjust_credits(request, user_id):
     client.credits += amount
     client.save(update_fields=['credits'])
 
-    CreditTransaction.objects.create(
+    txn = CreditTransaction.objects.create(
         user=client,
         type='adjustment',
         amount=amount,
         price=0,
     )
-    messages.success(request, f'Adjusted {amount:+} credits for {client.email}. New balance: {client.credits}.')
+
+    invoice_note = ''
+    if amount > 0:
+        invoice = Invoice.objects.create(
+            user=client,
+            transaction=txn,
+            credits=amount,
+            amount=0,
+            issued_by=request.user,
+            notes=request.POST.get('notes', '').strip(),
+        )
+        invoice.email_sent = send_credit_invoice_email(invoice)
+        invoice.save(update_fields=['email_sent'])
+        invoice_note = (
+            f' Invoice {invoice.invoice_number} emailed to {client.email}.'
+            if invoice.email_sent
+            else f' Invoice {invoice.invoice_number} created, but the email could not be sent.'
+        )
+
+    messages.success(request, f'Adjusted {amount:+} credits for {client.email}. New balance: {client.credits}.{invoice_note}')
     next_url = request.POST.get('next', '')
     if next_url == 'list':
         return redirect('admin_panel:client_list')

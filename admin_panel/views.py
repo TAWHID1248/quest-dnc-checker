@@ -9,8 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from accounts.models import CustomUser
-from billing.emails import send_credit_invoice_email
 from billing.models import CreditTransaction, Invoice, Payment, PaymentMethod
+from billing.tasks import send_invoice_email_task
 from scrubber.models import ScrubJob
 from support.models import SupportTicket
 from .decorators import admin_required
@@ -166,13 +166,8 @@ def client_adjust_credits(request, user_id):
             issued_by=request.user,
             notes=request.POST.get('notes', '').strip(),
         )
-        invoice.email_sent = send_credit_invoice_email(invoice)
-        invoice.save(update_fields=['email_sent'])
-        invoice_note = (
-            f' Invoice {invoice.invoice_number} emailed to {client.email}.'
-            if invoice.email_sent
-            else f' Invoice {invoice.invoice_number} created, but the email could not be sent.'
-        )
+        send_invoice_email_task.delay(invoice.pk)
+        invoice_note = f' Invoice {invoice.invoice_number} is being emailed to {client.email}.'
 
     messages.success(request, f'Adjusted {amount:+} credits for {client.email}. New balance: {client.credits}.{invoice_note}')
     next_url = request.POST.get('next', '')

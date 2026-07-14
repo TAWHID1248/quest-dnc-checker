@@ -3,12 +3,131 @@
 {% block page_title %}Support{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-header py-3">
-    <h6 class="mb-0 fw-semibold">Support Tickets</h6>
+<div class="row g-4">
+
+  <!-- ── Contact channels ─────────────────────────────────── -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-headset me-2" style="color:#3b82f6;"></i>Contact Us</h6>
+      </div>
+      <div class="card-body p-4">
+        <p class="text-secondary mb-4" style="font-size:.875rem;">
+          Reach us on any channel below — we usually reply within a few hours.
+        </p>
+
+        <!-- Email -->
+        <label class="form-label mb-2" style="font-size:.8rem;color:#8b949e;">
+          <i class="bi bi-envelope-fill me-1" style="color:#3b82f6;"></i>Email
+        </label>
+        <div class="mb-3 d-flex align-items-center justify-content-between gap-2 rounded"
+             style="background:#161b22;border:1px solid #30363d;padding:.75rem 1rem;">
+          <a href="mailto:support@checkdnc.net" class="text-decoration-none"
+             style="font-family:monospace;font-size:.95rem;font-weight:600;color:#e6edf3;user-select:all;overflow-wrap:anywhere;">support@checkdnc.net</a>
+          <button class="btn btn-sm" type="button" onclick="copyContact(this, 'support@checkdnc.net')"
+                  style="border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:.8rem;font-weight:600;white-space:nowrap;">
+            <i class="bi bi-clipboard me-1"></i><span>Copy</span>
+          </button>
+        </div>
+
+        <!-- WhatsApp -->
+        <label class="form-label mb-2" style="font-size:.8rem;color:#8b949e;">
+          <i class="bi bi-whatsapp me-1" style="color:#25d366;"></i>WhatsApp
+        </label>
+        <div class="mb-3 d-flex align-items-center justify-content-between gap-2 rounded"
+             style="background:#161b22;border:1px solid #30363d;padding:.75rem 1rem;">
+          <a href="https://wa.me/14234327902" target="_blank" rel="noopener" class="text-decoration-none"
+             style="font-family:monospace;font-size:.95rem;font-weight:600;color:#e6edf3;user-select:all;letter-spacing:.02em;">+1 423 432 7902</a>
+          <button class="btn btn-sm" type="button" onclick="copyContact(this, '+14234327902')"
+                  style="border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:.8rem;font-weight:600;white-space:nowrap;">
+            <i class="bi bi-clipboard me-1"></i><span>Copy</span>
+          </button>
+        </div>
+
+        <!-- Telegram -->
+        <label class="form-label mb-2" style="font-size:.8rem;color:#8b949e;">
+          <i class="bi bi-telegram me-1" style="color:#229ed9;"></i>Telegram
+        </label>
+        <div class="mb-1 d-flex align-items-center justify-content-between gap-2 rounded"
+             style="background:#161b22;border:1px solid #30363d;padding:.75rem 1rem;">
+          <a href="https://t.me/checkdnc" target="_blank" rel="noopener" class="text-decoration-none"
+             style="font-family:monospace;font-size:.95rem;font-weight:600;color:#e6edf3;user-select:all;">@checkdnc</a>
+          <button class="btn btn-sm" type="button" onclick="copyContact(this, '@checkdnc')"
+                  style="border:1px solid #30363d;background:#21262d;color:#8b949e;font-size:.8rem;font-weight:600;white-space:nowrap;">
+            <i class="bi bi-clipboard me-1"></i><span>Copy</span>
+          </button>
+        </div>
+
+        <div class="mt-4 p-3 rounded d-flex align-items-center gap-2"
+             style="background:#161b22;border:1px solid #21262d;font-size:.78rem;color:#6e7681;">
+          <i class="bi bi-info-circle-fill" style="color:#3b82f6;font-size:.9rem;flex-shrink:0;"></i>
+          Include your account email <strong style="color:#8b949e;">{{ user.email }}</strong> so we
+          can find your account faster.
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="card-body p-4">
-    <p class="text-secondary" style="font-size:0.875rem;"><em>Support functionality coming soon.</em></p>
+
+  <!-- ── Message form ─────────────────────────────────────── -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header py-3">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-chat-left-text me-2" style="color:#3b82f6;"></i>Send us a message</h6>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:.85rem;color:#8b949e;">Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required maxlength="150"
+                     value="{{ form_data.name }}" placeholder="Your name">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-size:.85rem;color:#8b949e;">Email <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control" required maxlength="254"
+                     value="{{ form_data.email }}" placeholder="you@company.com">
+            </div>
+            <div class="col-12">
+              <label class="form-label" style="font-size:.85rem;color:#8b949e;">Phone Number</label>
+              <input type="tel" name="number" class="form-control" maxlength="30"
+                     value="{{ form_data.number }}" placeholder="+1 555 000 0000">
+            </div>
+            <div class="col-12">
+              <label class="form-label" style="font-size:.85rem;color:#8b949e;">Message <span class="text-danger">*</span></label>
+              <textarea name="message" class="form-control" rows="6" required maxlength="5000"
+                        placeholder="How can we help you?">{{ form_data.message }}</textarea>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary fw-semibold px-4">
+                <i class="bi bi-send me-2"></i>Send Message
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function copyContact(btn, text) {
+    var done = function() {
+      btn.style.borderColor = '#3fb950'; btn.style.color = '#3fb950';
+      btn.querySelector('span').textContent = 'Copied!';
+      setTimeout(function() {
+        btn.style.borderColor = '#30363d'; btn.style.color = '#8b949e';
+        btn.querySelector('span').textContent = 'Copy';
+      }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function() { waPopupFallbackCopy(text, done); });
+    } else {
+      waPopupFallbackCopy(text, done);
+    }
+  }
+</script>
 {% endblock %}

@@ -134,16 +134,17 @@ Stored Stripe payment cards linked to a user.
 
 ## Email notifications
 
-Email is sent by the Celery worker after job completion. Configure via env vars:
+Email is sent by the Celery worker after job completion. Production uses Brevo SMTP
+(credentials from https://app.brevo.com → Settings → SMTP & API). Configure via env vars:
 
 ```
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp.gmail.com
+EMAIL_HOST=smtp-relay.brevo.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=True
-EMAIL_HOST_USER=you@example.com
-EMAIL_HOST_PASSWORD=app-password
-DEFAULT_FROM_EMAIL=noreply@questdnc.com
+EMAIL_HOST_USER=8xxxxx001@smtp-brevo.com   # Brevo SMTP login
+EMAIL_HOST_PASSWORD=xsmtpsib-...           # Brevo SMTP key (not the account password)
+DEFAULT_FROM_EMAIL=noreply@checkdnc.net
 ```
 
 During development the default console backend prints emails to the worker log.

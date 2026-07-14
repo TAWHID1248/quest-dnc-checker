@@ -2,6 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "celery -A quest_dnc worker --loglevel=info --concurrency=2"
+startCommand = "sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 300'"
+healthcheckPath = "/health/"
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

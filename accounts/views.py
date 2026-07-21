@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -10,6 +12,8 @@ from django.utils import timezone
 from billing.models import CreditTransaction, PaymentMethod
 from scrubber.models import ScrubJob
 from .forms import LoginForm, RegisterForm, ProfileForm
+
+logger = logging.getLogger(__name__)
 
 
 def login_view(request):
@@ -69,6 +73,12 @@ def register_view(request):
             messages.success(request, 'Account created! 100,000 credits have been added to your account.')
         else:
             messages.success(request, 'Account created successfully.')
+
+        try:
+            from .tasks import send_welcome_email
+            send_welcome_email.delay(user.pk, 100_000 if promo_code_obj else 0)
+        except Exception:
+            logger.exception("Failed to queue welcome email for %s", user.email)
 
         login(request, user)
         return redirect('dashboard')

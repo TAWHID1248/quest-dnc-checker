@@ -1,9 +1,16 @@
+# Service-specific settings (start command, health check) are configured per
+# service in the Railway dashboard — do NOT set them here, because this file
+# applies to every service deploying this repo (web, worker, beat) and a
+# startCommand here would override the worker's celery command with gunicorn.
+#
+#   web    → sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 300'
+#            health check path: /health/
+#   worker → celery -A quest_dnc worker --loglevel=info --concurrency=2
+#   beat   → celery -A quest_dnc beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
 [build]
 builder = "nixpacks"
 
 [deploy]
-startCommand = "sh -c 'mkdir -p staticfiles && python manage.py migrate --noinput && python manage.py collectstatic --noinput --clear && gunicorn quest_dnc.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 300'"
-healthcheckPath = "/health/"
-healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

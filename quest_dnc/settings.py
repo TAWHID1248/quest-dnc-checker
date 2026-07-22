@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     # Third-party
     'django_celery_beat',
     'django_celery_results',
+    'anymail',
     # Local apps
     'accounts',
     'agents',
@@ -176,6 +177,14 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@checkdnc.net')
 EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
+
+# Brevo HTTP API (Railway blocks outbound SMTP, so SMTP times out there).
+# Setting BREVO_API_KEY switches email to Brevo's REST API over HTTPS,
+# overriding EMAIL_BACKEND above.
+BREVO_API_KEY = config('BREVO_API_KEY', default='')
+if BREVO_API_KEY:
+    EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+    ANYMAIL = {'BREVO_API_KEY': BREVO_API_KEY}
 
 # CSRF / Security — trust Railway and custom domains
 CSRF_TRUSTED_ORIGINS = config(

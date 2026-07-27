@@ -18,6 +18,7 @@ urlpatterns = [
     path('scrubber/', include('scrubber.urls', namespace='scrubber')),
     path('billing/', include('billing.urls', namespace='billing')),
     path('support/', include('support.urls', namespace='support')),
+    path('appsumo/', include('appsumo.urls', namespace='appsumo')),
     path('panel/', include('admin_panel.urls', namespace='admin_panel')),
     path('', dashboard_view, name='home'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

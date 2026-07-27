@@ -223,6 +223,25 @@ celery -A quest_dnc beat --loglevel=info \
 
 ---
 
+## AppSumo licensing
+
+App `appsumo/` implements the AppSumo Licensing API (docs.licensing.appsumo.com):
+
+- `POST /appsumo/webhook/` — HMAC-SHA256-verified webhooks (`X-Appsumo-Signature` over
+  `timestamp + body`, keyed with `APPSUMO_API_KEY`). Handles purchase/activate/upgrade/
+  downgrade/deactivate; every event is logged to `AppSumoWebhookEvent`. Responds
+  `{"success": true, "event": ...}`. Test events (`"test": true`) are acknowledged only.
+- `GET /appsumo/redirect/` — OAuth redirect. Bare GET returns 200 (AppSumo URL validation).
+  With `?code=`, exchanges it at `appsumo.com/openid/token/`, fetches the license key,
+  then links it to the logged-in user or stashes it in the session and sends the buyer to
+  register (login/register views call `link_pending_session_license`).
+- Credits per tier come from `APPSUMO_TIER_CREDITS` (default `1:100000,2:250000,3:1000000`).
+  Granting is an idempotent top-up (`sync_license_credits`): upgrades grant the tier
+  difference, downgrades never claw back, deactivation (refund) removes up to what the
+  license granted. Env vars: `APPSUMO_CLIENT_ID`, `APPSUMO_CLIENT_SECRET`, `APPSUMO_API_KEY`.
+
+---
+
 ## Admin access
 
 Users with `role=ADMIN` see an "Admin" section in the sidebar.

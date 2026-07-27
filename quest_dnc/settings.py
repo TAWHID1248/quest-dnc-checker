@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'support',
     'admin_panel',
     'dnc_master',
+    'appsumo',
 ]
 
 MIDDLEWARE = [
@@ -208,6 +209,20 @@ DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=500, cast=int)
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')
+
+# AppSumo Licensing API (Partner Portal → Redemption step)
+APPSUMO_CLIENT_ID     = config('APPSUMO_CLIENT_ID', default='')
+APPSUMO_CLIENT_SECRET = config('APPSUMO_CLIENT_SECRET', default='')
+APPSUMO_API_KEY       = config('APPSUMO_API_KEY', default='')  # signs webhooks + Licensing API auth
+
+# Credits granted per AppSumo tier, e.g. "1:100000,2:250000,3:1000000"
+APPSUMO_TIER_CREDITS = {
+    int(tier): int(amount)
+    for tier, amount in (
+        pair.split(':') for pair in
+        config('APPSUMO_TIER_CREDITS', default='1:100000,2:250000,3:1000000').split(',')
+    )
+}
 
 LOGGING = {
     'version': 1,

@@ -22,6 +22,9 @@ def login_view(request):
     form = LoginForm(request, data=request.POST or None)
     if request.method == 'POST' and form.is_valid():
         login(request, form.get_user())
+        from appsumo.services import link_pending_session_license
+        if link_pending_session_license(request, request.user):
+            messages.success(request, 'Your AppSumo license is activated — credits have been added to your account.')
         return redirect(request.GET.get('next', 'dashboard'))
     return render(request, 'accounts/login.html', {'form': form})
 
@@ -81,6 +84,9 @@ def register_view(request):
             logger.exception("Failed to queue welcome email for %s", user.email)
 
         login(request, user)
+        from appsumo.services import link_pending_session_license
+        if link_pending_session_license(request, user):
+            messages.success(request, 'Your AppSumo license is activated — credits have been added to your account.')
         return redirect('dashboard')
     return render(request, 'accounts/register.html', {'form': form})
 

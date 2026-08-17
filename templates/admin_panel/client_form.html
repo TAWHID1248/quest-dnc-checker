@@ -60,7 +60,6 @@
             <label class="form-label" style="color:#8b949e;font-size:.85rem;">Role</label>
             <select name="role" class="form-select">
               <option value="client" {% if client.role == 'client' or not client %}selected{% endif %}>Client</option>
-              <option value="agent" {% if client.role == 'agent' %}selected{% endif %}>Agent</option>
               {% if user.is_admin %}
               <option value="sub_admin" {% if client.role == 'sub_admin' %}selected{% endif %}>Sub Admin</option>
               <option value="admin" {% if client.role == 'admin' %}selected{% endif %}>Admin</option>

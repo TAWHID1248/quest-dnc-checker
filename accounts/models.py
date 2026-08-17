@@ -23,7 +23,6 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         CLIENT = 'client', 'Client'
-        AGENT = 'agent', 'Agent'
         SUB_ADMIN = 'sub_admin', 'Sub Admin'
         ADMIN = 'admin', 'Admin'
 

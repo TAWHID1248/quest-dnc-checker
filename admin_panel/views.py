@@ -458,8 +458,8 @@ def client_create(request):
 
         allowed_roles = [r[0] for r in CustomUser.Role.choices]
         if not request.user.is_admin:
-            # Sub-admins may only create clients and agents
-            allowed_roles = [CustomUser.Role.CLIENT, CustomUser.Role.AGENT]
+            # Sub-admins may only create clients
+            allowed_roles = [CustomUser.Role.CLIENT]
         if role not in allowed_roles:
             role = 'client'
 
@@ -501,8 +501,8 @@ def client_edit(request, user_id):
         role = request.POST.get('role', client.role)
         allowed_roles = [r[0] for r in CustomUser.Role.choices]
         if not request.user.is_admin:
-            # Sub-admins may only assign client/agent roles
-            allowed_roles = [CustomUser.Role.CLIENT, CustomUser.Role.AGENT]
+            # Sub-admins may only assign the client role
+            allowed_roles = [CustomUser.Role.CLIENT]
         if role in allowed_roles:
             client.role = role
 

@@ -159,7 +159,7 @@
               <td class="text-center"><span class="status-badge s-{{ job.status }}">{{ job.get_status_display }}</span></td>
               <td class="text-end" style="color:#6e7681;">{{ job.created_at|date:"M d, Y" }}</td>
               <td class="text-center">
-                {% if job.result_file and job.status == 'completed' %}
+                {% if user.is_admin and job.result_file and job.status == 'completed' %}
                   <a href="{{ job.result_file.url }}" class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i></a>
                 {% else %}
                   <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-download"></i></button>

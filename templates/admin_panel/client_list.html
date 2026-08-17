@@ -53,10 +53,18 @@
         </div>
       </div>
       <div class="d-flex gap-1">
-        <a href="?{% if q %}q={{ q }}&{% endif %}" class="btn btn-sm btn-outline-secondary filter-btn {% if not status %}active-filter{% endif %}">All</a>
-        <a href="?{% if q %}q={{ q }}&{% endif %}status=active" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'active' %}active-filter{% endif %}">Active</a>
-        <a href="?{% if q %}q={{ q }}&{% endif %}status=inactive" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'inactive' %}active-filter{% endif %}">Inactive</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}role={{ role }}" class="btn btn-sm btn-outline-secondary filter-btn {% if not status %}active-filter{% endif %}">All</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}role={{ role }}&status=active" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'active' %}active-filter{% endif %}">Active</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}role={{ role }}&status=inactive" class="btn btn-sm btn-outline-secondary filter-btn {% if status == 'inactive' %}active-filter{% endif %}">Inactive</a>
       </div>
+      {% if user.is_admin %}
+      <div class="d-flex gap-1">
+        {% for value, label in role_choices %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if status %}status={{ status }}&{% endif %}role={{ value }}"
+           class="btn btn-sm btn-outline-secondary filter-btn {% if role == value %}active-filter{% endif %}">{{ label }}s</a>
+        {% endfor %}
+      </div>
+      {% endif %}
       <button type="submit" class="btn btn-sm btn-primary">Search</button>
     </form>
   </div>

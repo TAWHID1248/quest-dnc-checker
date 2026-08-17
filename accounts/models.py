@@ -24,6 +24,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         CLIENT = 'client', 'Client'
         AGENT = 'agent', 'Agent'
+        SUB_ADMIN = 'sub_admin', 'Sub Admin'
         ADMIN = 'admin', 'Admin'
 
     email = models.EmailField(unique=True)
@@ -54,6 +55,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     @property
     def is_admin(self):
         return self.role == self.Role.ADMIN
+
+    @property
+    def is_staff_member(self):
+        """Admin or sub-admin — may access the /panel/ dashboard."""
+        return self.role in (self.Role.ADMIN, self.Role.SUB_ADMIN)
 
     @property
     def display_name(self):

@@ -13,14 +13,22 @@ from billing.models import CreditTransaction, Invoice, Payment, PaymentMethod
 from billing.tasks import send_invoice_email_task
 from scrubber.models import ScrubJob
 from support.models import SupportTicket
-from .decorators import admin_required
+from .decorators import admin_required, staff_required
 
 logger = logging.getLogger(__name__)
+
+# Roles a sub-admin is NOT allowed to act on or assign
+PRIVILEGED_ROLES = {CustomUser.Role.ADMIN, CustomUser.Role.SUB_ADMIN}
+
+
+def _can_manage_target(actor, target):
+    """Sub-admins may not modify admin or sub-admin accounts."""
+    return actor.is_admin or target.role not in PRIVILEGED_ROLES
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def dashboard(request):
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -66,12 +74,18 @@ def dashboard(request):
 
 # ── Client Management ──────────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def client_list(request):
     q      = request.GET.get('q', '').strip()
     status = request.GET.get('status', '')
+    role   = request.GET.get('role', 'client')
 
-    clients = CustomUser.objects.filter(role='client').order_by('-date_joined')
+    # Only full admins may browse non-client roles
+    valid_roles = [r[0] for r in CustomUser.Role.choices]
+    if role not in valid_roles or not request.user.is_admin:
+        role = 'client'
+
+    clients = CustomUser.objects.filter(role=role).order_by('-date_joined')
 
     if q:
         clients = clients.filter(
@@ -91,11 +105,13 @@ def client_list(request):
         'clients': clients,
         'q': q,
         'status': status,
+        'role': role,
+        'role_choices': CustomUser.Role.choices,
         'total': clients.count(),
     })
 
 
-@admin_required
+@staff_required
 def client_detail(request, user_id):
     client = get_object_or_404(CustomUser, pk=user_id)
 
@@ -122,11 +138,14 @@ def client_detail(request, user_id):
     })
 
 
-@admin_required
+@staff_required
 def client_toggle(request, user_id):
     if request.method != 'POST':
         return redirect('admin_panel:client_list')
     client = get_object_or_404(CustomUser, pk=user_id)
+    if not _can_manage_target(request.user, client):
+        messages.error(request, 'You do not have permission to modify admin accounts.')
+        return redirect('admin_panel:client_list')
     client.is_active = not client.is_active
     client.save(update_fields=['is_active'])
     action = 'activated' if client.is_active else 'deactivated'
@@ -135,11 +154,14 @@ def client_toggle(request, user_id):
     return redirect(next_url)
 
 
-@admin_required
+@staff_required
 def client_adjust_credits(request, user_id):
     if request.method != 'POST':
         return redirect('admin_panel:client_list')
     client = get_object_or_404(CustomUser, pk=user_id)
+    if not _can_manage_target(request.user, client):
+        messages.error(request, 'You do not have permission to adjust credits for admin accounts.')
+        return redirect('admin_panel:client_list')
     try:
         amount = int(request.POST.get('amount', 0))
     except ValueError:
@@ -178,7 +200,7 @@ def client_adjust_credits(request, user_id):
 
 # ── Support Tickets ────────────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def ticket_list(request):
     status_filter   = request.GET.get('status', '')
     priority_filter = request.GET.get('priority', '')
@@ -213,7 +235,7 @@ def ticket_list(request):
     })
 
 
-@admin_required
+@staff_required
 def ticket_update_status(request, ticket_id):
     if request.method != 'POST':
         return redirect('admin_panel:ticket_list')
@@ -229,7 +251,7 @@ def ticket_update_status(request, ticket_id):
 
 # ── Payment History ────────────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def payment_list(request):
     status_filter = request.GET.get('status', '')
     q             = request.GET.get('q', '').strip()
@@ -266,7 +288,7 @@ def payment_list(request):
 
 # ── Scrub Jobs (global) ────────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def scrub_job_list(request):
     status_filter = request.GET.get('status', '')
     q             = request.GET.get('q', '').strip()
@@ -301,7 +323,7 @@ def scrub_job_list(request):
 
 # ── Credit Transactions (global) ───────────────────────────────────────────
 
-@admin_required
+@staff_required
 def transaction_list(request):
     type_filter = request.GET.get('type', '')
     q           = request.GET.get('q', '').strip()
@@ -335,7 +357,7 @@ def transaction_list(request):
 
 # ── Payment Methods (global) ───────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def payment_method_list(request):
     q = request.GET.get('q', '').strip()
 
@@ -355,7 +377,7 @@ def payment_method_list(request):
 
 # ── Force-cancel / force-fail a stuck job (admin) ─────────────────────────
 
-@admin_required
+@staff_required
 def force_cancel_job(request, job_id):
     """
     Immediately mark a job CANCELLED regardless of Celery task state.
@@ -410,7 +432,7 @@ def download_user_upload(request, job_id):
 
 # ── Client Create / Edit ───────────────────────────────────────────────────
 
-@admin_required
+@staff_required
 def client_create(request):
     if request.method == 'POST':
         email    = request.POST.get('email', '').strip().lower()
@@ -434,7 +456,11 @@ def client_create(request):
                 'post': request.POST,
             })
 
-        if role not in [r[0] for r in CustomUser.Role.choices]:
+        allowed_roles = [r[0] for r in CustomUser.Role.choices]
+        if not request.user.is_admin:
+            # Sub-admins may only create clients and agents
+            allowed_roles = [CustomUser.Role.CLIENT, CustomUser.Role.AGENT]
+        if role not in allowed_roles:
             role = 'client'
 
         try:
@@ -459,9 +485,13 @@ def client_create(request):
     })
 
 
-@admin_required
+@staff_required
 def client_edit(request, user_id):
     client = get_object_or_404(CustomUser, pk=user_id)
+
+    if not _can_manage_target(request.user, client):
+        messages.error(request, 'You do not have permission to edit admin accounts.')
+        return redirect('admin_panel:client_list')
 
     if request.method == 'POST':
         client.name    = request.POST.get('name', '').strip()
@@ -469,7 +499,11 @@ def client_edit(request, user_id):
         client.company = request.POST.get('company', '').strip()
 
         role = request.POST.get('role', client.role)
-        if role in [r[0] for r in CustomUser.Role.choices]:
+        allowed_roles = [r[0] for r in CustomUser.Role.choices]
+        if not request.user.is_admin:
+            # Sub-admins may only assign client/agent roles
+            allowed_roles = [CustomUser.Role.CLIENT, CustomUser.Role.AGENT]
+        if role in allowed_roles:
             client.role = role
 
         client.is_active = request.POST.get('is_active') == '1'

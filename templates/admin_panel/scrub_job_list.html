@@ -142,7 +142,7 @@
           <td class="text-center" style="color:#f85149;">{{ job.dnc }}</td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ job.created_at|date:"M d, Y" }}</td>
           <td class="text-center" style="white-space:nowrap;">
-            {% if job.file %}
+            {% if user.is_admin and job.file %}
               <a href="{% url 'admin_panel:download_user_upload' job.job_id %}"
                  class="btn btn-sm btn-outline-primary me-1" title="Download original uploaded file">
                 <i class="bi bi-download"></i>
@@ -158,9 +158,9 @@
                 </button>
               </form>
             {% endif %}
-            {% if not job.file and job.status not in 'pending,queued,processing,paused' %}
+            {% if job.status not in 'pending,queued,processing,paused' %}{% if not job.file or not user.is_admin %}
               <span style="color:#6e7681;font-size:.78rem;">—</span>
-            {% endif %}
+            {% endif %}{% endif %}
           </td>
         </tr>
         {% empty %}

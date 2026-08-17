@@ -55,7 +55,7 @@
   <div>
     <h5 class="fw-bold mb-0" style="color:#e6edf3;">{{ user.display_name }}</h5>
     <div style="color:#6e7681;font-size:.875rem;">{{ user.email }}</div>
-    <span class="badge mt-1 {% if user.is_admin %}bg-primary{% else %}bg-secondary{% endif %}">
+    <span class="badge mt-1 {% if user.is_admin %}bg-primary{% elif user.is_staff_member %}bg-info{% else %}bg-secondary{% endif %}">
       {{ user.get_role_display }}
     </span>
   </div>
@@ -133,7 +133,7 @@
           <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid #21262d;">
             <dt style="color:#6e7681;font-weight:400;">Account role</dt>
             <dd class="mb-0">
-              <span class="badge {% if user.is_admin %}bg-primary{% else %}bg-secondary{% endif %}">
+              <span class="badge {% if user.is_admin %}bg-primary{% elif user.is_staff_member %}bg-info{% else %}bg-secondary{% endif %}">
                 {{ user.get_role_display }}
               </span>
             </dd>

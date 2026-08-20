@@ -69,6 +69,21 @@
     .divider { color: #6e7681; font-size: 0.8rem; }
     .auth-footer { font-size: 0.8rem; color: #6e7681; text-align: center; margin-top: 1rem; }
     .auth-footer a { color: #3b82f6; text-decoration: none; }
+    .password-wrap { position: relative; }
+    .password-wrap .form-control { padding-right: 2.75rem; }
+    .password-toggle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      color: #6e7681;
+      padding: 0 0.75rem;
+      display: flex;
+      align-items: center;
+    }
+    .password-toggle:hover { color: #e6edf3; }
   </style>
 </head>
 <body>
@@ -86,5 +101,16 @@
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmM+OgJlW/OAAS/sLkCCxFI5Q8q"
     crossorigin="anonymous"
   ></script>
+  <script>
+    document.querySelectorAll('.password-toggle').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var input = btn.closest('.password-wrap').querySelector('input');
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      });
+    });
+  </script>
 </body>
 </html>

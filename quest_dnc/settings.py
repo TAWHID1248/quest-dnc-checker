@@ -179,6 +179,9 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@checkdnc.net')
 EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
 
+# Password reset links expire after 1 hour (Django default is 3 days)
+PASSWORD_RESET_TIMEOUT = config('PASSWORD_RESET_TIMEOUT', default=3600, cast=int)
+
 # Brevo HTTP API (Railway blocks outbound SMTP, so SMTP times out there).
 # Setting BREVO_API_KEY switches email to Brevo's REST API over HTTPS,
 # overriding EMAIL_BACKEND above.

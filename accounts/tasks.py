@@ -7,6 +7,18 @@ from django.core.mail import send_mail
 logger = logging.getLogger(__name__)
 
 
+@shared_task(name='accounts.tasks.send_password_reset_email', ignore_result=True)
+def send_password_reset_email(subject, body, to_email):
+    """Send the password-reset email from the worker, where email is configured."""
+    send_mail(
+        subject, body,
+        settings.DEFAULT_FROM_EMAIL,
+        [to_email],
+        fail_silently=False,
+    )
+    logger.info("Sent password reset email to %s", to_email)
+
+
 @shared_task(name='accounts.tasks.send_welcome_email', ignore_result=True)
 def send_welcome_email(user_id, promo_credits=0):
     """Send the signup welcome email from the worker, where SMTP is configured."""

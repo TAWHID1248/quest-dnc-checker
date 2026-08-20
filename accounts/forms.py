@@ -1,3 +1,5 @@
+import logging
+
 from django import forms
 from django.contrib.auth.forms import (
     AuthenticationForm,
@@ -6,7 +8,11 @@ from django.contrib.auth.forms import (
     UserChangeForm,
     UserCreationForm,
 )
+from django.template import loader
+
 from .models import CustomUser
+
+logger = logging.getLogger(__name__)
 
 
 class LoginForm(AuthenticationForm):
@@ -38,6 +44,23 @@ class StyledPasswordResetForm(PasswordResetForm):
             'autofocus': True,
         }),
     )
+
+    def send_mail(self, subject_template_name, email_template_name, context,
+                  from_email, to_email, html_email_template_name=None):
+        # Queue on the Celery worker (where email is configured on Railway),
+        # falling back to a synchronous send if the broker is unreachable.
+        subject = loader.render_to_string(subject_template_name, context)
+        subject = ''.join(subject.splitlines())
+        body = loader.render_to_string(email_template_name, context)
+        try:
+            from .tasks import send_password_reset_email
+            send_password_reset_email.delay(subject, body, to_email)
+        except Exception:
+            logger.exception("Failed to queue password reset email for %s; sending synchronously", to_email)
+            super().send_mail(
+                subject_template_name, email_template_name, context,
+                from_email, to_email, html_email_template_name,
+            )
 
 
 class StyledSetPasswordForm(SetPasswordForm):

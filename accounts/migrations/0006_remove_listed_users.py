@@ -17,10 +17,40 @@ REMOVE_EMAILS = [
 ]
 
 
+# django-allauth was removed from the project but its tables remain in the
+# production DB with FKs to accounts_customuser; the ORM can't cascade into
+# them, so they must be cleared with raw SQL before deleting the users.
+ORPHAN_TABLE_CLEANUP = [
+    ('account_emailconfirmation',
+     'DELETE FROM account_emailconfirmation WHERE email_address_id IN '
+     '(SELECT id FROM account_emailaddress WHERE user_id = ANY(%s))'),
+    ('account_emailaddress',
+     'DELETE FROM account_emailaddress WHERE user_id = ANY(%s)'),
+    ('socialaccount_socialtoken',
+     'DELETE FROM socialaccount_socialtoken WHERE account_id IN '
+     '(SELECT id FROM socialaccount_socialaccount WHERE user_id = ANY(%s))'),
+    ('socialaccount_socialaccount',
+     'DELETE FROM socialaccount_socialaccount WHERE user_id = ANY(%s)'),
+]
+
+
 def remove_users(apps, schema_editor):
     CustomUser = apps.get_model('accounts', 'CustomUser')
-    deleted, _ = CustomUser.objects.filter(email__in=REMOVE_EMAILS).delete()
-    print(f'\n  Deleted {deleted} records for {len(REMOVE_EMAILS)} listed accounts.')
+    ids = list(
+        CustomUser.objects.filter(email__in=REMOVE_EMAILS).values_list('id', flat=True)
+    )
+    if not ids:
+        print('\n  No listed accounts found; nothing to delete.')
+        return
+
+    with schema_editor.connection.cursor() as cursor:
+        for table, sql in ORPHAN_TABLE_CLEANUP:
+            cursor.execute('SELECT to_regclass(%s)', [table])
+            if cursor.fetchone()[0] is not None:
+                cursor.execute(sql, [ids])
+
+    deleted, _ = CustomUser.objects.filter(id__in=ids).delete()
+    print(f'\n  Deleted {deleted} records for {len(ids)} listed accounts.')
 
 
 class Migration(migrations.Migration):

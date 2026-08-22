@@ -29,8 +29,8 @@ class AgentPromoCode(models.Model):
     class Meta:
         unique_together = [('agent', 'sequence')]
         indexes = [
-            models.Index(fields=['agent', 'status']),
-            models.Index(fields=['status', 'expires_at']),
+            models.Index(fields=['agent', 'status'], name='agents_agent_status_idx'),
+            models.Index(fields=['status', 'expires_at'], name='agents_status_expires_idx'),
         ]
         ordering = ['-created_at']
 

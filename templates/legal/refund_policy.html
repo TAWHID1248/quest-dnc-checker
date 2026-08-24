@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Refund Policy — CheckDNC</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+    crossorigin="anonymous"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  />
+  <style>
+    body {
+      background: #010409;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    .legal-topbar {
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+    }
+    .legal-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      color: #e6edf3;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .legal-brand .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: #3b82f6;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .legal-card {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+    }
+    .legal-card h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+    .legal-updated {
+      font-size: 0.85rem;
+      color: #6e7681;
+    }
+    .legal-card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-top: 2.25rem;
+      margin-bottom: 0.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #21262d;
+    }
+    .legal-card p,
+    .legal-card li {
+      font-size: 0.9rem;
+      color: #8b949e;
+      line-height: 1.7;
+    }
+    .legal-card ul {
+      padding-left: 1.25rem;
+    }
+    .legal-card li {
+      margin-bottom: 0.35rem;
+    }
+    .legal-card a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .legal-card a:hover {
+      text-decoration: underline;
+    }
+    .legal-card strong {
+      color: #c9d1d9;
+    }
+    .legal-footer {
+      font-size: 0.8rem;
+      color: #6e7681;
+      text-align: center;
+    }
+    .legal-footer a { color: #3b82f6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <nav class="legal-topbar px-3 px-md-4 py-3 d-flex align-items-center justify-content-between">
+    <a href="/" class="legal-brand">
+      <div class="brand-icon"><i class="bi bi-shield-check text-white"></i></div>
+      CheckDNC
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
+    </a>
+  </nav>
+
+  <div class="container py-4 py-md-5" style="max-width: 860px;">
+    <div class="legal-card p-4 p-md-5">
+      <h1>Refund Policy</h1>
+      <p class="legal-updated mb-0">Last updated: August 23, 2026</p>
+
+      <h2>1. Our refund period</h2>
+      <p>Customers may request a full refund within 14 calendar days of the relevant purchase or subscription payment.</p>
+      <p>This refund period applies to purchases of CheckDNC credits, subscriptions, and other software-access packages sold through Paddle.</p>
+
+      <h2>2. Requesting a refund</h2>
+      <p>Payments for CheckDNC are processed by Paddle, our authorised reseller and Merchant of Record.</p>
+      <p>To request a refund, customers may:</p>
+      <ul>
+        <li>Use the &ldquo;View receipt&rdquo; or &ldquo;Manage subscription&rdquo; link in the Paddle purchase-confirmation email; or</li>
+        <li>Visit <a href="https://paddle.net" target="_blank" rel="noopener">https://paddle.net</a> and select the refund-request option.</li>
+      </ul>
+      <p>Customers may also contact CheckDNC at <a href="mailto:contact@checkdnc.net">contact@checkdnc.net</a> for product-related assistance.</p>
+
+      <h2>3. Processing the refund</h2>
+      <p>Approved refunds will be returned to the original payment method. The time required for the refund to appear depends on the payment method and financial institution.</p>
+      <p>Access to the credits, subscription, or services associated with a refunded purchase may end when the refund is issued.</p>
+
+      <h2>4. Consumer rights</h2>
+      <p>This policy does not limit any mandatory refund, withdrawal, cancellation, or consumer-protection rights available under applicable law.</p>
+      <p>Where local law or Paddle&rsquo;s Refund Policy provides the customer with greater rights, those greater rights will apply.</p>
+      <p>Paddle&rsquo;s Refund Policy is available at:<br /><a href="https://www.paddle.com/legal/refund-policy" target="_blank" rel="noopener">https://www.paddle.com/legal/refund-policy</a></p>
+
+      <h2>5. Merchant of Record</h2>
+      <p>Our order process is conducted by our authorised online reseller, Paddle.com. Paddle is the Merchant of Record for purchases completed through Paddle and is responsible for processing payments, issuing applicable invoices, handling billing-related customer service, and administering refunds.</p>
+
+      <h2>6. Contact</h2>
+      <p>CheckDNC is a software product operated by <strong>NEBS-IT SOLUTION LTD</strong>, a company registered in England and Wales.</p>
+      <p>
+        Email: <a href="mailto:contact@checkdnc.net">contact@checkdnc.net</a><br />
+        Website: <a href="https://checkdnc.net">https://checkdnc.net</a>
+      </p>
+
+      <p class="mt-4 mb-0">See also our <a href="{% url 'terms_of_service' %}">Terms of Service</a> and <a href="{% url 'privacy_policy' %}">Privacy Policy</a>.</p>
+    </div>
+
+    <div class="legal-footer mt-4">
+      &copy; NEBS-IT SOLUTION LTD &middot; <a href="/">CheckDNC</a>
+    </div>
+  </div>
+</body>
+</html>

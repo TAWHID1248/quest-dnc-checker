@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — CheckDNC</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+    crossorigin="anonymous"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  />
+  <style>
+    body {
+      background: #010409;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    .legal-topbar {
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+    }
+    .legal-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      color: #e6edf3;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .legal-brand .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: #3b82f6;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .legal-card {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+    }
+    .legal-card h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+    .legal-updated {
+      font-size: 0.85rem;
+      color: #6e7681;
+    }
+    .legal-card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-top: 2.25rem;
+      margin-bottom: 0.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #21262d;
+    }
+    .legal-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #c9d1d9;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .legal-card p,
+    .legal-card li {
+      font-size: 0.9rem;
+      color: #8b949e;
+      line-height: 1.7;
+    }
+    .legal-card ul {
+      padding-left: 1.25rem;
+    }
+    .legal-card li {
+      margin-bottom: 0.35rem;
+    }
+    .legal-card a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .legal-card a:hover {
+      text-decoration: underline;
+    }
+    .legal-card strong {
+      color: #c9d1d9;
+    }
+    .legal-footer {
+      font-size: 0.8rem;
+      color: #6e7681;
+      text-align: center;
+    }
+    .legal-footer a { color: #3b82f6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <nav class="legal-topbar px-3 px-md-4 py-3 d-flex align-items-center justify-content-between">
+    <a href="/" class="legal-brand">
+      <div class="brand-icon"><i class="bi bi-shield-check text-white"></i></div>
+      CheckDNC
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
+    </a>
+  </nav>
+
+  <div class="container py-4 py-md-5" style="max-width: 860px;">
+    <div class="legal-card p-4 p-md-5">
+      <h1>Privacy Policy</h1>
+      <p class="legal-updated mb-0">Last updated: August 23, 2026</p>
+
+      <h2>1. About this Privacy Policy</h2>
+      <p>This Privacy Policy explains how <strong>NEBS-IT SOLUTION LTD</strong> (&ldquo;CheckDNC,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;) collects, uses, stores, and shares personal data when people visit the CheckDNC website, create an account, purchase or use the Service, contact support, or otherwise interact with us.</p>
+      <p>CheckDNC is a business-to-business compliance-screening software platform.</p>
+
+      <h2>2. Our data-protection roles</h2>
+      <p>For account, website, support, security, and business-administration information, NEBS-IT SOLUTION LTD generally acts as the data controller.</p>
+      <p>When a business customer submits telephone-number records or other personal data for screening, the customer generally acts as the data controller and CheckDNC acts as its data processor or service provider.</p>
+      <p>Customers are responsible for establishing a lawful basis for collecting, submitting, screening, and using their records.</p>
+
+      <h2>3. Information we collect</h2>
+      <p>Depending on how you use CheckDNC, we may collect:</p>
+
+      <h3>Account information</h3>
+      <ul>
+        <li>Name;</li>
+        <li>Business name;</li>
+        <li>Business email address;</li>
+        <li>Telephone number;</li>
+        <li>Username and account identifiers;</li>
+        <li>Account preferences; and</li>
+        <li>Authorised-user information.</li>
+      </ul>
+
+      <h3>Customer-submitted data</h3>
+      <ul>
+        <li>Telephone numbers;</li>
+        <li>Fields contained in uploaded CSV, TXT, or supported files;</li>
+        <li>Suppression or screening instructions;</li>
+        <li>Processing results;</li>
+        <li>Upload and export history; and</li>
+        <li>Related metadata.</li>
+      </ul>
+      <p>Customers should submit only the information necessary for screening.</p>
+
+      <h3>Transaction information</h3>
+      <ul>
+        <li>Products, credits, or subscriptions purchased;</li>
+        <li>Transaction identifiers;</li>
+        <li>Payment status;</li>
+        <li>Billing country;</li>
+        <li>Tax-related information;</li>
+        <li>Refund and dispute information; and</li>
+        <li>Paddle customer or transaction references.</li>
+      </ul>
+      <p>Complete payment-card information for Paddle transactions is collected and processed by Paddle, not CheckDNC.</p>
+
+      <h3>Technical and usage information</h3>
+      <ul>
+        <li>IP address;</li>
+        <li>Browser and device information;</li>
+        <li>Operating system;</li>
+        <li>Login and access records;</li>
+        <li>Pages and features used;</li>
+        <li>API requests;</li>
+        <li>Error and security logs;</li>
+        <li>Cookie identifiers; and</li>
+        <li>Date and time of activity.</li>
+      </ul>
+
+      <h3>Communications</h3>
+      <ul>
+        <li>Support requests;</li>
+        <li>Contact-form submissions;</li>
+        <li>Email correspondence;</li>
+        <li>Feedback; and</li>
+        <li>Records of communications with our team.</li>
+      </ul>
+
+      <h2>4. How we use personal data</h2>
+      <p>We use personal data to:</p>
+      <ul>
+        <li>Create and administer accounts;</li>
+        <li>Authenticate users and secure the Service;</li>
+        <li>Process submitted records and generate screening results;</li>
+        <li>Provide reports, exports, APIs, and requested functionality;</li>
+        <li>Administer credits, subscriptions, and purchases;</li>
+        <li>Provide customer service and technical support;</li>
+        <li>Diagnose errors and maintain Service availability;</li>
+        <li>Prevent fraud, abuse, and unauthorised access;</li>
+        <li>Monitor compliance with our Terms;</li>
+        <li>Improve the Service and understand feature usage;</li>
+        <li>Maintain appropriate business and transaction records;</li>
+        <li>Communicate service-related information;</li>
+        <li>Respond to lawful requests and meet legal obligations; and</li>
+        <li>Establish, exercise, or defend legal claims.</li>
+      </ul>
+      <p>We do not sell customer-uploaded telephone-number lists.</p>
+      <p>We do not use submitted lists to place calls or send marketing messages.</p>
+
+      <h2>5. Legal bases</h2>
+      <p>Where the UK GDPR or EU GDPR applies, we rely on one or more of the following legal bases:</p>
+      <ul>
+        <li><strong>Contract:</strong> Processing necessary to provide the Service or take requested pre-contractual steps;</li>
+        <li><strong>Legitimate interests:</strong> Securing, operating, supporting, and improving the Service; preventing fraud and abuse; and managing our business;</li>
+        <li><strong>Legal obligation:</strong> Processing necessary to comply with tax, accounting, regulatory, sanctions, or other legal requirements;</li>
+        <li><strong>Consent:</strong> Where consent is legally required, including for certain cookies or optional communications; and</li>
+        <li><strong>Legal claims:</strong> Processing necessary to establish, exercise, or defend legal rights.</li>
+      </ul>
+      <p>Where we process customer-submitted data as a processor, the business customer determines the applicable legal basis.</p>
+
+      <h2>6. Customer responsibilities</h2>
+      <p>Customers must ensure that:</p>
+      <ul>
+        <li>Submitted personal data was collected lawfully;</li>
+        <li>A valid legal basis exists for processing;</li>
+        <li>Required privacy notices have been provided;</li>
+        <li>Consent, where required, is valid and documented;</li>
+        <li>Opt-outs and do-not-contact requests are respected;</li>
+        <li>Only necessary information is submitted;</li>
+        <li>Data is not used for unlawful telemarketing, spam, harassment, or discrimination; and</li>
+        <li>Screening results are used in accordance with applicable laws.</li>
+      </ul>
+      <p>CheckDNC results do not replace the customer&rsquo;s legal responsibilities.</p>
+
+      <h2>7. Payment processing through Paddle</h2>
+      <p>Paddle acts as the Merchant of Record for purchases completed through Paddle.</p>
+      <p>Paddle independently processes payment, transaction, billing, tax, fraud-prevention, refund, and buyer-support information under its own privacy notice.</p>
+      <p>Paddle&rsquo;s Privacy Notice is available at:<br /><a href="https://www.paddle.com/legal/privacy" target="_blank" rel="noopener">https://www.paddle.com/legal/privacy</a></p>
+      <p>We may receive limited transaction information from Paddle to activate purchases, manage customer accounts, prevent fraud, provide support, and reconcile payments.</p>
+
+      <h2>8. Service providers</h2>
+      <p>We may use vetted service providers for:</p>
+      <ul>
+        <li>Cloud hosting and infrastructure;</li>
+        <li>Database and file storage;</li>
+        <li>Security and fraud prevention;</li>
+        <li>Authentication;</li>
+        <li>Email delivery;</li>
+        <li>Error monitoring and analytics;</li>
+        <li>Customer support;</li>
+        <li>Payment and transaction administration; and</li>
+        <li>Professional legal, accounting, or compliance services.</li>
+      </ul>
+      <p>Service providers may process personal data only as necessary to provide contracted services and subject to applicable confidentiality and data-protection obligations.</p>
+      <p>We may also disclose information when required by law, court order, regulatory request, or to protect legal rights and system security.</p>
+
+      <h2>9. International transfers</h2>
+      <p>Personal data may be processed in countries outside the user&rsquo;s country of residence.</p>
+      <p>Where required, we use appropriate safeguards for international transfers, which may include adequacy regulations, the UK International Data Transfer Agreement, the UK Addendum, Standard Contractual Clauses, or another lawful transfer mechanism.</p>
+
+      <h2>10. Data retention</h2>
+      <p>We retain personal data only for as long as reasonably necessary for the purpose for which it was collected, including providing the Service, maintaining security and audit records, resolving disputes, and satisfying legal, tax, accounting, or regulatory requirements.</p>
+      <p>Customer-submitted files and screening results should be retained according to a documented operational retention schedule. Customers may request deletion where applicable, subject to technical and legal limitations.</p>
+      <p>Backups and security records may remain for a limited period after deletion before being overwritten through ordinary retention cycles.</p>
+
+      <h2>11. Data security</h2>
+      <p>We use reasonable technical and organisational safeguards intended to protect personal data. These may include:</p>
+      <ul>
+        <li>Encryption in transit;</li>
+        <li>Appropriate access controls;</li>
+        <li>Authentication and credential protections;</li>
+        <li>Infrastructure monitoring;</li>
+        <li>Logging and abuse prevention;</li>
+        <li>Restricted staff access; and</li>
+        <li>Backup and recovery procedures.</li>
+      </ul>
+      <p>No system is completely secure. Customers are responsible for protecting their credentials and using secure methods when uploading, accessing, and exporting data.</p>
+
+      <h2>12. Cookies</h2>
+      <p>The CheckDNC website and application may use:</p>
+      <ul>
+        <li>Essential cookies required for login, security, and Service operation;</li>
+        <li>Preference cookies;</li>
+        <li>Analytics cookies; and</li>
+        <li>Other optional technologies where permitted.</li>
+      </ul>
+      <p>Where required by law, non-essential cookies will be used only after consent. Users may manage applicable preferences through the cookie banner or browser settings.</p>
+
+      <h2>13. Marketing communications</h2>
+      <p>We may send product or service communications where legally permitted.</p>
+      <p>Recipients may unsubscribe from optional marketing communications using the link in the message or by contacting us.</p>
+      <p>Service, security, billing, and account-related notices may still be sent when necessary to provide the Service.</p>
+      <p>We do not use customer-uploaded telephone-number lists for CheckDNC&rsquo;s own marketing.</p>
+
+      <h2>14. Data-protection rights</h2>
+      <p>Depending on location and applicable law, individuals may have the right to:</p>
+      <ul>
+        <li>Access personal data;</li>
+        <li>Correct inaccurate information;</li>
+        <li>Request deletion;</li>
+        <li>Restrict processing;</li>
+        <li>Object to certain processing;</li>
+        <li>Receive portable data;</li>
+        <li>Withdraw consent;</li>
+        <li>Opt out of certain communications; and</li>
+        <li>Complain to a data-protection authority.</li>
+      </ul>
+      <p>These rights may be subject to legal limitations.</p>
+      <p>Where CheckDNC processes data on behalf of a business customer, an individual should ordinarily direct the request to that customer. We will provide reasonable assistance to the customer where required.</p>
+
+      <h2>15. UK complaints</h2>
+      <p>Individuals in the United Kingdom may complain to the Information Commissioner&rsquo;s Office:<br /><a href="https://ico.org.uk/make-a-complaint/" target="_blank" rel="noopener">https://ico.org.uk/make-a-complaint/</a></p>
+      <p>We encourage individuals to contact us first so we can attempt to address the concern.</p>
+
+      <h2>16. Children</h2>
+      <p>CheckDNC is a business service and is not intended for children. We do not knowingly offer accounts to children or intentionally collect children&rsquo;s information through the Service.</p>
+
+      <h2>17. Business transfers</h2>
+      <p>If NEBS-IT SOLUTION LTD is involved in a merger, acquisition, reorganisation, financing, or sale of business assets, relevant information may be transferred as part of that transaction, subject to applicable law and appropriate confidentiality protections.</p>
+
+      <h2>18. Changes to this Policy</h2>
+      <p>We may update this Privacy Policy to reflect changes in the Service, legal requirements, security practices, or processing activities.</p>
+      <p>The updated policy will be posted on this page with a revised &ldquo;Last updated&rdquo; date. Material changes will be communicated where required by law.</p>
+
+      <h2>19. Contact</h2>
+      <p>CheckDNC is operated by:</p>
+      <p>
+        <strong>NEBS-IT SOLUTION LTD</strong><br />
+        Registered in England and Wales<br />
+        Email: <a href="mailto:contact@checkdnc.net">contact@checkdnc.net</a><br />
+        Website: <a href="https://checkdnc.net">https://checkdnc.net</a>
+      </p>
+      <p>For data-protection questions or requests, use the email address above with the subject &ldquo;Privacy Request.&rdquo;</p>
+
+      <p class="mt-4 mb-0">See also our <a href="{% url 'terms_of_service' %}">Terms of Service</a> and <a href="{% url 'refund_policy' %}">Refund Policy</a>.</p>
+    </div>
+
+    <div class="legal-footer mt-4">
+      &copy; NEBS-IT SOLUTION LTD &middot; <a href="/">CheckDNC</a>
+    </div>
+  </div>
+</body>
+</html>

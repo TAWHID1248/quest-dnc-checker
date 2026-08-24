@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — CheckDNC</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+    crossorigin="anonymous"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  />
+  <style>
+    body {
+      background: #010409;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    .legal-topbar {
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+    }
+    .legal-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      text-decoration: none;
+      color: #e6edf3;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .legal-brand .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: #3b82f6;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .legal-card {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+    }
+    .legal-card h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+    .legal-updated {
+      font-size: 0.85rem;
+      color: #6e7681;
+    }
+    .legal-card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-top: 2.25rem;
+      margin-bottom: 0.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #21262d;
+    }
+    .legal-card p,
+    .legal-card li {
+      font-size: 0.9rem;
+      color: #8b949e;
+      line-height: 1.7;
+    }
+    .legal-card ul {
+      padding-left: 1.25rem;
+    }
+    .legal-card li {
+      margin-bottom: 0.35rem;
+    }
+    .legal-card a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .legal-card a:hover {
+      text-decoration: underline;
+    }
+    .legal-card strong {
+      color: #c9d1d9;
+    }
+    .legal-footer {
+      font-size: 0.8rem;
+      color: #6e7681;
+      text-align: center;
+    }
+    .legal-footer a { color: #3b82f6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <nav class="legal-topbar px-3 px-md-4 py-3 d-flex align-items-center justify-content-between">
+    <a href="/" class="legal-brand">
+      <div class="brand-icon"><i class="bi bi-shield-check text-white"></i></div>
+      CheckDNC
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-box-arrow-in-right me-1"></i>Sign in
+    </a>
+  </nav>
+
+  <div class="container py-4 py-md-5" style="max-width: 860px;">
+    <div class="legal-card p-4 p-md-5">
+      <h1>Terms of Service</h1>
+      <p class="legal-updated mb-0">Last updated: August 23, 2026</p>
+
+      <h2>1. About these Terms</h2>
+      <p>These Terms of Service govern access to and use of the CheckDNC website, application, APIs, data-processing tools, reports, credits, and related services collectively referred to as the &ldquo;Service.&rdquo;</p>
+      <p>CheckDNC is a software product owned and operated by <strong>NEBS-IT SOLUTION LTD</strong>, a company registered in England and Wales (&ldquo;CheckDNC,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;).</p>
+      <p>By creating an account, purchasing credits or a subscription, accessing the Service, or using any CheckDNC feature, you agree to these Terms. If you do not agree, you must not use the Service.</p>
+
+      <h2>2. Description of the Service</h2>
+      <p>CheckDNC is a business-to-business compliance-screening software platform. It enables authorised business users to submit telephone-number records and compare them against supported do-not-call, suppression, risk, or compliance-related datasets.</p>
+      <p>Depending on the selected package, the Service may provide:</p>
+      <ul>
+        <li>File-based telephone-number screening;</li>
+        <li>Record formatting and validation;</li>
+        <li>Results showing possible matches against supported datasets;</li>
+        <li>Downloadable screening reports;</li>
+        <li>Processing histories and audit-related information; and</li>
+        <li>API access or integrations where available.</li>
+      </ul>
+      <p>CheckDNC does not place calls, send messages, operate marketing campaigns, sell telephone-number lists, supply leads, or provide legal advice.</p>
+      <p>Screening results are informational compliance-support outputs. They do not constitute legal advice or guarantee that any proposed communication is lawful.</p>
+
+      <h2>3. Business use</h2>
+      <p>The Service is intended for legitimate business use. You represent that:</p>
+      <ul>
+        <li>You have the authority to enter into these Terms;</li>
+        <li>Your account and business information are accurate;</li>
+        <li>You will use the Service only for lawful purposes; and</li>
+        <li>You have obtained all permissions, notices, consents, or other lawful bases required to process the information you submit.</li>
+      </ul>
+      <p>You remain responsible for determining whether you may lawfully contact any person, regardless of the result returned by the Service.</p>
+
+      <h2>4. Customer data and lawful authority</h2>
+      <p>You must not upload, submit, or process personal data unless you have the legal right and lawful basis to do so.</p>
+      <p>By submitting data, you confirm that:</p>
+      <ul>
+        <li>You obtained it lawfully;</li>
+        <li>Its use does not violate privacy, marketing, telecommunications, consumer-protection, or data-protection laws;</li>
+        <li>You have provided any required privacy notices;</li>
+        <li>You will honour applicable consent withdrawals and opt-out requests; and</li>
+        <li>You will not use CheckDNC results to override or disregard a person&rsquo;s request not to be contacted.</li>
+      </ul>
+      <p>You retain responsibility for the source, legality, accuracy, and use of submitted data.</p>
+
+      <h2>5. Prohibited uses</h2>
+      <p>You must not use the Service:</p>
+      <ul>
+        <li>For unlawful, fraudulent, deceptive, abusive, or harmful activity;</li>
+        <li>To contact people without the consent or lawful authority required by applicable law;</li>
+        <li>To evade do-not-call, suppression, consent, or opt-out requirements;</li>
+        <li>To identify individuals for harassment, intimidation, discrimination, or exploitation;</li>
+        <li>To upload stolen, scraped, unlawfully purchased, or improperly obtained data;</li>
+        <li>To facilitate spam, unlawful telemarketing, robocalling, or mass messaging;</li>
+        <li>To violate the TCPA, TSR, GDPR, UK GDPR, PECR, or another applicable law;</li>
+        <li>To gain unauthorised access to another person&rsquo;s systems or data;</li>
+        <li>To reverse engineer, probe, overload, damage, or disrupt the Service;</li>
+        <li>To resell, sublicense, reproduce, or commercially redistribute the Service or its datasets without written authorisation;</li>
+        <li>To misrepresent CheckDNC results as legal advice or regulatory approval; or</li>
+        <li>To use the Service in a manner that violates Paddle&rsquo;s Acceptable Use Policy.</li>
+      </ul>
+      <p>We may suspend or terminate access when we reasonably believe the Service is being used unlawfully or in violation of these Terms.</p>
+
+      <h2>6. Screening results and limitations</h2>
+      <p>Do-not-call and compliance requirements may vary by jurisdiction and may change over time. External datasets may contain delays, errors, omissions, or incomplete records.</p>
+      <p>CheckDNC does not warrant that:</p>
+      <ul>
+        <li>Every applicable registry or restriction is included;</li>
+        <li>Every dataset is complete or continuously available;</li>
+        <li>Every result is error-free;</li>
+        <li>A number marked as clear may lawfully be contacted;</li>
+        <li>Using the Service alone satisfies all legal requirements; or</li>
+        <li>Use of the Service will prevent complaints, investigations, penalties, or legal claims.</li>
+      </ul>
+      <p>Customers should maintain appropriate internal compliance procedures and obtain qualified legal advice where necessary.</p>
+
+      <h2>7. Accounts and security</h2>
+      <p>You are responsible for:</p>
+      <ul>
+        <li>Maintaining accurate account information;</li>
+        <li>Protecting your login credentials and API keys;</li>
+        <li>Restricting account access to authorised users;</li>
+        <li>Activities performed through your account; and</li>
+        <li>Informing us promptly of suspected unauthorised access.</li>
+      </ul>
+      <p>You must not share credentials with unauthorised persons or attempt to access another customer&rsquo;s account.</p>
+
+      <h2>8. Credits, pricing, and service access</h2>
+      <p>Available packages, credit quantities, prices, and features are displayed on the CheckDNC website or within the application.</p>
+      <p>Unless the applicable offer states otherwise:</p>
+      <ul>
+        <li>Credits are consumed when eligible records are processed;</li>
+        <li>Credit usage may vary based on the selected processing operation;</li>
+        <li>Purchasing credits does not transfer ownership of the Service or underlying datasets;</li>
+        <li>Promotional or free credits have no monetary value;</li>
+        <li>Prices may be changed for future purchases; and</li>
+        <li>Existing purchases will not be repriced retroactively.</li>
+      </ul>
+      <p>Any expiration period or usage limit must be displayed clearly before purchase.</p>
+
+      <h2>9. Paddle payments</h2>
+      <p>Our order process is conducted by our authorised online reseller, Paddle.com. Paddle is the Merchant of Record for purchases completed through Paddle.</p>
+      <p>Paddle processes payments, applicable taxes, invoices, billing-related customer support, returns, and refunds. Purchases made through Paddle are also governed by Paddle&rsquo;s applicable Buyer Terms and Refund Policy.</p>
+      <p>Paddle Buyer Terms:<br /><a href="https://www.paddle.com/legal/buyer-terms" target="_blank" rel="noopener">https://www.paddle.com/legal/buyer-terms</a></p>
+      <p>Paddle Refund Policy:<br /><a href="https://www.paddle.com/legal/refund-policy" target="_blank" rel="noopener">https://www.paddle.com/legal/refund-policy</a></p>
+      <p>We do not directly collect or store complete payment-card details for transactions processed by Paddle.</p>
+
+      <h2>10. Refunds</h2>
+      <p>Customers may request a full refund within 14 calendar days of the relevant purchase or subscription payment.</p>
+      <p>Refund requests are administered in accordance with our published Refund Policy and Paddle&rsquo;s applicable policies. Our Refund Policy is available at:<br /><a href="{% url 'refund_policy' %}">https://checkdnc.net/refund-policy</a></p>
+      <p>Nothing in these Terms limits mandatory consumer rights.</p>
+
+      <h2>11. Intellectual property</h2>
+      <p>The Service, software, design, branding, interfaces, documentation, reports, and related materials are owned by or licensed to NEBS-IT SOLUTION LTD and are protected by applicable intellectual-property laws.</p>
+      <p>We grant customers a limited, non-exclusive, non-transferable, revocable right to use the Service for authorised internal business purposes, subject to these Terms.</p>
+      <p>No ownership rights are transferred to the customer.</p>
+
+      <h2>12. Customer data ownership</h2>
+      <p>As between you and CheckDNC, you retain your rights in the data you submit.</p>
+      <p>You grant us a limited right to host, transmit, format, compare, analyse, and otherwise process submitted data only as necessary to:</p>
+      <ul>
+        <li>Provide the requested Service;</li>
+        <li>Produce and deliver results;</li>
+        <li>Maintain security and prevent abuse;</li>
+        <li>Provide customer support;</li>
+        <li>Comply with legal obligations; and</li>
+        <li>Enforce these Terms.</li>
+      </ul>
+      <p>Our handling of personal data is described in the CheckDNC <a href="{% url 'privacy_policy' %}">Privacy Policy</a>.</p>
+
+      <h2>13. Confidentiality and security</h2>
+      <p>We use reasonable technical and organisational safeguards designed to protect submitted data.</p>
+      <p>No online service can guarantee absolute security. You are responsible for evaluating whether the Service&rsquo;s safeguards are appropriate for the nature of the information you submit.</p>
+      <p>You must not submit sensitive personal data&mdash;including financial-account details, medical information, government identification numbers, or authentication credentials&mdash;unless CheckDNC expressly supports that data and its submission is lawful.</p>
+
+      <h2>14. Service availability and changes</h2>
+      <p>We aim to provide a reliable Service, but availability may be interrupted by maintenance, security events, infrastructure failures, external providers, or circumstances outside our reasonable control.</p>
+      <p>We may update, improve, replace, or discontinue individual features. Where a material change affects a paid service, we will provide reasonable notice where practicable.</p>
+
+      <h2>15. Suspension and termination</h2>
+      <p>We may restrict, suspend, or terminate an account if:</p>
+      <ul>
+        <li>These Terms are violated;</li>
+        <li>Submitted data appears unlawfully obtained;</li>
+        <li>The Service is used for prohibited activity;</li>
+        <li>Payment is reversed, disputed, or remains unpaid;</li>
+        <li>Account activity creates a security or legal risk; or</li>
+        <li>Suspension is required by Paddle, a service provider, or a competent authority.</li>
+      </ul>
+      <p>You may stop using the Service at any time. Ending an account does not eliminate obligations or liabilities incurred before termination.</p>
+
+      <h2>16. Disclaimers</h2>
+      <p>The Service is provided on an &ldquo;as available&rdquo; basis to the extent permitted by law.</p>
+      <p>CheckDNC is a technology provider and not a law firm, regulator, government registry, or legal adviser. Results must not be treated as legal advice, formal regulatory clearance, or permission to contact an individual.</p>
+      <p>Nothing in these Terms excludes warranties or rights that cannot lawfully be excluded.</p>
+
+      <h2>17. Limitation of liability</h2>
+      <p>To the maximum extent permitted by law, NEBS-IT SOLUTION LTD will not be liable for indirect, incidental, special, consequential, or punitive losses, including loss of profits, business, reputation, data, or anticipated savings.</p>
+      <p>Our total liability arising from the Service will not exceed the amount paid for the affected Service during the 12 months preceding the event giving rise to the claim.</p>
+      <p>These limitations do not apply where liability cannot legally be limited or excluded, including liability for fraud or fraudulent misrepresentation.</p>
+
+      <h2>18. Indemnification</h2>
+      <p>To the extent permitted by law, you agree to indemnify NEBS-IT SOLUTION LTD against third-party claims, penalties, losses, and reasonable costs arising from:</p>
+      <ul>
+        <li>Data you submitted without lawful authority;</li>
+        <li>Your unlawful communication or marketing activity;</li>
+        <li>Your violation of privacy, telecommunications, or consumer-protection laws;</li>
+        <li>Your misuse of screening results; or</li>
+        <li>Your material breach of these Terms.</li>
+      </ul>
+
+      <h2>19. Governing law</h2>
+      <p>These Terms are governed by the laws of England and Wales, without limiting any mandatory rights a customer may have under the laws of another applicable jurisdiction.</p>
+      <p>The courts of England and Wales will have jurisdiction, except where applicable law requires otherwise.</p>
+
+      <h2>20. Changes to these Terms</h2>
+      <p>We may update these Terms to reflect changes to the Service, law, security requirements, or business practices.</p>
+      <p>The updated version will be posted on this page with a revised &ldquo;Last updated&rdquo; date. Material changes will be communicated where required by law.</p>
+
+      <h2>21. Contact</h2>
+      <p>CheckDNC is operated by:</p>
+      <p>
+        <strong>NEBS-IT SOLUTION LTD</strong><br />
+        Registered in England and Wales<br />
+        Email: <a href="mailto:contact@checkdnc.net">contact@checkdnc.net</a><br />
+        Website: <a href="https://checkdnc.net">https://checkdnc.net</a>
+      </p>
+    </div>
+
+    <div class="legal-footer mt-4">
+      &copy; NEBS-IT SOLUTION LTD &middot; <a href="/">CheckDNC</a>
+    </div>
+  </div>
+</body>
+</html>

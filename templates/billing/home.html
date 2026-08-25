@@ -22,22 +22,6 @@
   .tier-features li i { color:#3fb950; flex-shrink:0; }
 
   /* WhatsApp purchase modal */
-  .wa-number-box {
-    display:flex; align-items:center; justify-content:space-between; gap:.75rem;
-    background:#161b22; border:1px solid #30363d; border-radius:10px;
-    padding:.85rem 1rem;
-  }
-  .wa-number {
-    font-family:monospace; font-size:1.15rem; font-weight:700; color:#e6edf3;
-    letter-spacing:.03em; user-select:all;
-  }
-  .btn-copy-wa {
-    border:1px solid #30363d; background:#21262d; color:#8b949e;
-    border-radius:8px; padding:.35rem .7rem; font-size:.8rem; font-weight:600;
-    transition:all .15s; white-space:nowrap;
-  }
-  .btn-copy-wa:hover { border-color:#3b82f6; color:#e6edf3; }
-  .btn-copy-wa.copied { border-color:#3fb950; color:#3fb950; background:#1a3a2a; }
   .btn-whatsapp {
     background:#25d366; border:none; color:#0d1117; font-weight:700;
   }
@@ -220,14 +204,6 @@
           {% endif %}
         </p>
 
-        <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">WhatsApp Number</label>
-        <div class="wa-number-box mb-3">
-          <span class="wa-number" id="wa-number-text">+1 347 251 6953</span>
-          <button class="btn-copy-wa" type="button" id="copy-wa-btn" onclick="copyWaNumber()">
-            <i class="bi bi-clipboard me-1"></i><span id="copy-wa-label">Copy</span>
-          </button>
-        </div>
-
         <a id="wa-chat-btn" class="btn btn-whatsapp w-100 fw-semibold py-2" href="#" target="_blank" rel="noopener">
           <i class="bi bi-whatsapp me-2"></i>Chat on WhatsApp
         </a>
@@ -294,11 +270,6 @@
     document.getElementById('wa-chat-btn').href =
       'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
 
-    /* reset copy button */
-    var cb = document.getElementById('copy-wa-btn');
-    cb.classList.remove('copied');
-    document.getElementById('copy-wa-label').textContent = 'Copy';
-
     /* show the modal div manually */
     var m = document.getElementById('purchaseModal');
     m.style.display = 'block';
@@ -328,34 +299,6 @@
       document.body.style.overflow = '';
       if (bd) bd.remove();
     }, 200);
-  }
-
-  /* ── Copy WhatsApp number ── */
-  function copyWaNumber() {
-    var num = '+' + WA_NUMBER;
-    var done = function() {
-      var cb = document.getElementById('copy-wa-btn');
-      cb.classList.add('copied');
-      document.getElementById('copy-wa-label').textContent = 'Copied!';
-      setTimeout(function() {
-        cb.classList.remove('copied');
-        document.getElementById('copy-wa-label').textContent = 'Copy';
-      }, 2000);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(num).then(done).catch(function(){ fallbackCopy(num, done); });
-    } else {
-      fallbackCopy(num, done);
-    }
-  }
-  function fallbackCopy(text, done) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); done(); } catch(e) {}
-    document.body.removeChild(ta);
   }
 
   /* ── PayPal checkout ── */

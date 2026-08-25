@@ -226,7 +226,7 @@
 
 {% block extra_js %}
 {% if paypal_client_id %}
-<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture&disable-funding=paylater,venmo&components=buttons"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture&disable-funding=paylater,venmo,card&components=buttons"></script>
 {% endif %}
 <script>
   var WA_NUMBER  = '13472516953';           /* wa.me format: no "+" */

@@ -149,6 +149,8 @@
 
       <div class="modal-body p-4">
 
+        <div id="purchase-flow">
+
         <!-- Order summary -->
         <div class="p-3 rounded mb-4 text-center" style="background:#161b22;border:1px solid #21262d;">
           <div id="modal-tier-name" style="font-size:.78rem;color:#6e7681;text-transform:uppercase;letter-spacing:.06em;font-weight:600;"></div>
@@ -157,10 +159,27 @@
           <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
 
+        {% if paypal_client_id %}
+        <!-- ── PayPal checkout ───────────────────── -->
+        <div id="paypal-button-container"></div>
+        <div id="paypal-error" style="display:none;font-size:.82rem;color:#f85149;margin-top:.5rem;"></div>
+
+        <div class="d-flex align-items-center gap-3 my-3">
+          <hr class="flex-grow-1 m-0" style="border-color:#30363d;">
+          <span style="color:#6e7681;font-size:.78rem;white-space:nowrap;">or buy via WhatsApp</span>
+          <hr class="flex-grow-1 m-0" style="border-color:#30363d;">
+        </div>
+        {% endif %}
+
         <!-- ── WhatsApp purchase ─────────────────── -->
         <p class="mb-3" style="color:#8b949e;font-size:.875rem;">
+          {% if paypal_client_id %}
+          Prefer to pay another way? Contact us on WhatsApp with your account email
+          and the plan you want — we'll add the credits after payment.
+          {% else %}
           To purchase this plan, contact us on WhatsApp. Send us your account email
           and the plan you want — we'll add the credits to your account after payment.
+          {% endif %}
         </p>
 
         <label class="form-label mb-2" style="font-size:.85rem;color:#8b949e;">WhatsApp Number</label>
@@ -181,6 +200,20 @@
           message so we can credit the right account.
         </div>
 
+        </div><!-- /#purchase-flow -->
+
+        <!-- ── Purchase success ──────────────────── -->
+        <div id="purchase-success" style="display:none;text-align:center;padding:1rem 0;">
+          <div style="font-size:2.5rem;">✅</div>
+          <h6 class="fw-bold mt-2 mb-1" style="color:#e6edf3;">Payment Successful!</h6>
+          <p style="color:#6e7681;font-size:.875rem;margin-bottom:.25rem;">Credits have been added to your account.</p>
+          <div style="font-size:1.6rem;font-weight:800;color:#3fb950;" id="success-balance"></div>
+          <div style="color:#6e7681;font-size:.78rem;margin-bottom:1rem;">new balance</div>
+          <button class="btn btn-outline-success w-100" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Done
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
@@ -188,9 +221,17 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if paypal_client_id %}
+<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture"></script>
+{% endif %}
 <script>
   var WA_NUMBER  = '13472516953';           /* wa.me format: no "+" */
   var USER_EMAIL = '{{ user.email|escapejs }}';
+
+  var PAYPAL_CREATE_URL  = '{% url "billing:paypal_create_order" %}';
+  var PAYPAL_CAPTURE_URL = '{% url "billing:paypal_capture_order" %}';
+  var CSRF_TOKEN         = '{{ csrf_token }}';
+  var currentTier        = null;
 
   /* ── Open modal (pure JS, no Bootstrap.Modal dependency) ── */
   function openPurchaseModal(btn) {
@@ -199,10 +240,16 @@
       price:   btn.getAttribute('data-price'),
       credits: btn.getAttribute('data-credits'),
     };
+    currentTier = tier;
 
     document.getElementById('modal-tier-name').textContent = tier.name + ' Plan';
     document.getElementById('modal-credits').textContent   = tier.credits;
     document.getElementById('modal-price').textContent     = '$' + tier.price;
+
+    /* reset to the purchase view and (re)render PayPal buttons */
+    document.getElementById('purchase-flow').style.display = '';
+    document.getElementById('purchase-success').style.display = 'none';
+    renderPayPalButtons();
 
     var msg = 'Hi! I want to buy the ' + tier.name + ' plan (' + tier.credits +
               ' credits) for $' + tier.price + '. My account email: ' + USER_EMAIL;
@@ -271,6 +318,62 @@
     ta.select();
     try { document.execCommand('copy'); done(); } catch(e) {}
     document.body.removeChild(ta);
+  }
+
+  /* ── PayPal checkout ── */
+  function showPayPalError(msg) {
+    var el = document.getElementById('paypal-error');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function showPurchaseSuccess(newBalance) {
+    document.getElementById('purchase-flow').style.display = 'none';
+    document.getElementById('purchase-success').style.display = 'block';
+    document.getElementById('success-balance').textContent =
+      Math.round(newBalance).toLocaleString() + ' credits';
+  }
+
+  function postJSON(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify(body),
+    }).then(function(res) {
+      return res.json().then(function(data) {
+        if (!res.ok || data.error) throw new Error(data.error || 'Request failed.');
+        return data;
+      });
+    });
+  }
+
+  function renderPayPalButtons() {
+    if (typeof paypal === 'undefined') return;   /* SDK not configured/loaded */
+    var container = document.getElementById('paypal-button-container');
+    if (!container) return;
+    container.innerHTML = '';
+    document.getElementById('paypal-error').style.display = 'none';
+
+    paypal.Buttons({
+      style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 45 },
+
+      createOrder: function() {
+        return postJSON(PAYPAL_CREATE_URL, { tier: currentTier.name })
+          .then(function(data) { return data.order_id; })
+          .catch(function(err) { showPayPalError(err.message); throw err; });
+      },
+
+      onApprove: function(data) {
+        return postJSON(PAYPAL_CAPTURE_URL, { order_id: data.orderID })
+          .then(function(res) { showPurchaseSuccess(res.credits); })
+          .catch(function(err) { showPayPalError(err.message); });
+      },
+
+      onError: function() {
+        showPayPalError('Something went wrong with PayPal. Please try again.');
+      },
+    }).render('#paypal-button-container');
   }
 
   document.addEventListener('DOMContentLoaded', function() {

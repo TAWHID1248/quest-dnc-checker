@@ -79,7 +79,7 @@
       <div class="flex-grow-1" style="min-width:220px;">
         <div class="input-group">
           <span class="input-group-text" style="background:#161b22;border-color:#30363d;color:#6e7681;"><i class="bi bi-search"></i></span>
-          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search payment ID, email or Stripe PI…">
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search payment ID, email or provider ref…">
         </div>
       </div>
       <div class="d-flex gap-1 flex-wrap">
@@ -106,7 +106,7 @@
           <th class="text-center">Credits</th>
           <th>Payment Method</th>
           <th class="text-center">Status</th>
-          <th>Stripe PI</th>
+          <th>Provider Ref</th>
           <th class="text-end">Date</th>
         </tr>
       </thead>
@@ -146,7 +146,7 @@
             {% endif %}
           </td>
           <td style="font-family:monospace;font-size:.72rem;color:#6e7681;">
-            {{ p.stripe_pi_id|default:"—"|truncatechars:28 }}
+            {{ p.paypal_order_id|default:p.stripe_pi_id|default:"—"|truncatechars:28 }}
           </td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ p.created_at|date:"M d, Y" }}</td>
         </tr>

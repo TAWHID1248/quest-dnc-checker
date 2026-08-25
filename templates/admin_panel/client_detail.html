@@ -180,7 +180,7 @@
     <div class="card">
       <div class="table-responsive">
         <table class="table mb-0 align-middle" style="font-size:.84rem;">
-          <thead><tr><th>Payment ID</th><th class="text-center">Amount</th><th class="text-center">Credits</th><th class="text-center">Status</th><th>Stripe PI</th><th class="text-end">Date</th></tr></thead>
+          <thead><tr><th>Payment ID</th><th class="text-center">Amount</th><th class="text-center">Credits</th><th class="text-center">Status</th><th>Provider Ref</th><th class="text-end">Date</th></tr></thead>
           <tbody>
             {% for p in payments %}
             <tr>
@@ -188,7 +188,7 @@
               <td class="text-center">${{ p.amount }}</td>
               <td class="text-center" style="color:#3fb950;">{{ p.credits|floatformat:0 }}</td>
               <td class="text-center"><span class="status-badge s-{{ p.status }}">{{ p.get_status_display }}</span></td>
-              <td style="font-size:.75rem;color:#6e7681;font-family:monospace;">{{ p.stripe_pi_id|default:"—"|truncatechars:24 }}</td>
+              <td style="font-size:.75rem;color:#6e7681;font-family:monospace;">{{ p.paypal_order_id|default:p.stripe_pi_id|default:"—"|truncatechars:24 }}</td>
               <td class="text-end" style="color:#6e7681;">{{ p.created_at|date:"M d, Y" }}</td>
             </tr>
             {% empty %}

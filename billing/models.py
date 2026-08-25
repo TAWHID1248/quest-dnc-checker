@@ -143,6 +143,11 @@ class Payment(models.Model):
         FAILED = 'failed', 'Failed'
         REFUNDED = 'refunded', 'Refunded'
 
+    class Provider(models.TextChoices):
+        STRIPE = 'stripe', 'Stripe'
+        PAYPAL = 'paypal', 'PayPal'
+        MANUAL = 'manual', 'Manual'
+
     payment_id = models.CharField(max_length=20, unique=True, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -158,7 +163,14 @@ class Payment(models.Model):
         related_name='payments',
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    stripe_pi_id = models.CharField(max_length=255, blank=True, help_text='Stripe PaymentIntent ID')
+    # Default is STRIPE so pre-PayPal rows stay labelled correctly; new code
+    # always passes provider explicitly.
+    provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.STRIPE)
+    stripe_pi_id = models.CharField(max_length=255, blank=True, help_text='Legacy Stripe PaymentIntent ID')
+    paypal_order_id = models.CharField(
+        max_length=255, unique=True, null=True, blank=True,
+        help_text='PayPal Order ID — idempotency key for credit grants',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

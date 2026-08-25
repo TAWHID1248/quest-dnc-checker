@@ -1,6 +1,5 @@
 import logging
 
-from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -9,7 +8,7 @@ from django.db.models import Sum, Count, Q
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
-from billing.models import CreditTransaction, PaymentMethod
+from billing.models import CreditTransaction
 from scrubber.models import ScrubJob
 from .forms import LoginForm, RegisterForm, ProfileForm
 
@@ -128,13 +127,10 @@ def profile_view(request):
         messages.success(request, 'Profile updated successfully.')
         return redirect(f"{request.path}?tab=profile")
 
-    payment_methods = PaymentMethod.objects.filter(user=request.user)
     credit_history = CreditTransaction.objects.filter(user=request.user).select_related('scrub_job')[:50]
 
     return render(request, 'accounts/profile.html', {
         'form': profile_form,
         'active_tab': active_tab,
-        'payment_methods': payment_methods,
         'credit_history': credit_history,
-        'stripe_pk': settings.STRIPE_PUBLISHABLE_KEY,
     })

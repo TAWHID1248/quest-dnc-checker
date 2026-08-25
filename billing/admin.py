@@ -29,8 +29,8 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ('payment_id', 'user', 'amount', 'credits', 'status', 'stripe_pi_id', 'created_at')
-    list_filter = ('status', 'created_at')
-    search_fields = ('payment_id', 'user__email', 'stripe_pi_id')
+    list_display = ('payment_id', 'user', 'amount', 'credits', 'status', 'provider', 'paypal_order_id', 'created_at')
+    list_filter = ('status', 'provider', 'created_at')
+    search_fields = ('payment_id', 'user__email', 'stripe_pi_id', 'paypal_order_id')
     readonly_fields = ('payment_id', 'created_at')
     ordering = ('-created_at',)

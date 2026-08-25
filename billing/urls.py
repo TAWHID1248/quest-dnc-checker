@@ -5,19 +5,11 @@ app_name = 'billing'
 
 urlpatterns = [
     path('', views.billing_home, name='home'),
-    path('config/', views.stripe_config, name='stripe_config'),
 
-    # Stripe AJAX endpoints
-    path('create-payment-intent/', views.create_payment_intent_view, name='create_payment_intent'),
-    path('create-setup-intent/',   views.create_setup_intent_view,   name='create_setup_intent'),
+    # PayPal AJAX endpoints
+    path('paypal/create-order/',  views.create_paypal_order_view,  name='paypal_create_order'),
+    path('paypal/capture-order/', views.capture_paypal_order_view, name='paypal_capture_order'),
 
-    # Payment method management
-    path('payment-method/<int:pm_id>/delete/',      views.delete_payment_method,      name='pm_delete'),
-    path('payment-method/<int:pm_id>/set-default/', views.set_default_payment_method, name='pm_set_default'),
-
-    # Frontend callback after confirmCardPayment succeeds
-    path('payment-complete/', views.payment_complete, name='payment_complete'),
-
-    # Stripe webhook (csrf_exempt inside the view)
-    path('webhook/', views.stripe_webhook, name='webhook'),
+    # PayPal webhook (csrf_exempt inside the view)
+    path('paypal/webhook/', views.paypal_webhook, name='paypal_webhook'),
 ]

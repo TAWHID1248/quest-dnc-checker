@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased via Stripe.
+A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased via PayPal Checkout (one-time orders), with a manual WhatsApp flow as fallback. (Stripe was removed in Aug 2026.)
 
 ---
 
@@ -16,7 +16,7 @@ A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. 
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
 | Static files | WhiteNoise (dev/Railway) / Nginx (Docker) |
-| Payments | Stripe (PaymentIntent + SetupIntent) |
+| Payments | PayPal Checkout v2 Orders (one-time); WhatsApp + admin grant fallback |
 | Auth | Django sessions, custom `accounts.CustomUser` (email-based) |
 | Deployment | Railway (primary), Docker + Nginx (self-hosted) |
 
@@ -33,7 +33,7 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 │   └── tasks.py            ← expire_promo_codes Celery beat task (hourly)
 ├── admin_panel/            ← Internal admin dashboard (client/ticket/payment mgmt)
 ├── api/                    ← Vercel WSGI wrapper (api/index.py)
-├── billing/                ← Credits, Stripe PaymentIntent/SetupIntent, webhooks
+├── billing/                ← Credits: pricing tiers, PayPal checkout (paypal_utils, services), webhook
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
 │   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
 │   ├── phone.py            ← Phone normalisation + file parsing
@@ -92,7 +92,8 @@ Immutable credit ledger. Type: PURCHASE | USAGE | REFUND | ADJUSTMENT. `amount` 
 negative for USAGE (consumed credits).
 
 ### `billing.PaymentMethod`
-Stored Stripe payment cards linked to a user.
+Legacy stored payment cards from the removed Stripe integration. Model kept for
+historical Payment/CreditTransaction FKs; no UI creates new records.
 
 ---
 
@@ -160,10 +161,10 @@ See `.env.example`. Critical vars:
 | `SECRET_KEY` | Django secret key |
 | `DATABASE_URL` | Full Postgres DSN (overrides `DB_*` vars) |
 | `REDIS_URL` | Redis DSN for broker + cache |
-| `STRIPE_PUBLISHABLE_KEY` | Stripe frontend key |
-| `STRIPE_SECRET_KEY` | Stripe backend key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `EMAIL_HOST_USER/PASSWORD` | SMTP credentials |
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal REST app credentials |
+| `PAYPAL_WEBHOOK_ID` | PayPal webhook ID (signature verification) |
+| `PAYPAL_MODE` | `sandbox` or `live` |
 | `DEBUG` | Set `False` in production |
 | `ALLOWED_HOSTS` | Comma-separated hostnames |
 | `CSRF_TRUSTED_ORIGINS` | Comma-separated HTTPS origins |
@@ -214,12 +215,25 @@ celery -A quest_dnc beat --loglevel=info \
 
 ---
 
-## Billing / Stripe
+## Billing / PayPal
 
 - Credit tiers: Starter $10→100K, Professional $20→250K, Enterprise $50→1M
-- `billing/stripe_utils.py` — PaymentIntent creation, SetupIntent for card saving
-- `billing/webhooks.py` — handles `payment_intent.succeeded` (credits top-up) and `setup_intent.succeeded` (card save)
-- Stripe webhook endpoint: `POST /billing/webhook/` (CSRF-exempt)
+  (defined in `PRICING_TIERS`, `billing/views.py`)
+- PayPal Checkout v2 Orders (one-time, no subscriptions):
+  - `billing/paypal_utils.py` — REST wrappers: OAuth token (cached in Redis),
+    create/capture/get order, webhook signature verification
+  - `billing/services.py` — `grant_paypal_credits()`: atomic Payment +
+    credit top-up + CreditTransaction, idempotent via unique `paypal_order_id`
+  - Flow: JS SDK button → `POST /billing/paypal/create-order/` →
+    buyer approves in popup → `POST /billing/paypal/capture-order/` (primary
+    credit path) → `POST /billing/paypal/webhook/` (`PAYMENT.CAPTURE.COMPLETED`,
+    fallback; signature-verified, rejects if `PAYPAL_WEBHOOK_ID` unset)
+  - Env: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`,
+    `PAYPAL_MODE` (sandbox|live). If no client ID, the pricing page shows
+    the WhatsApp flow only.
+- WhatsApp manual purchase remains as a secondary option in the modal.
+- Historical Stripe IDs remain on `Payment.stripe_pi_id`, `PaymentMethod.stripe_pm_id`,
+  and `CustomUser.stripe_customer_id` — display-only legacy data (Stripe removed Aug 2026).
 
 ---
 

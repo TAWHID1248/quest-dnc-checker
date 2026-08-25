@@ -262,7 +262,8 @@ def payment_list(request):
         payments = payments.filter(status=status_filter)
     if q:
         payments = payments.filter(
-            Q(payment_id__icontains=q) | Q(user__email__icontains=q) | Q(stripe_pi_id__icontains=q)
+            Q(payment_id__icontains=q) | Q(user__email__icontains=q)
+            | Q(stripe_pi_id__icontains=q) | Q(paypal_order_id__icontains=q)
         )
 
     agg = Payment.objects.filter(status='completed').aggregate(

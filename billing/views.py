@@ -1,27 +1,17 @@
 import json
 import logging
+from decimal import Decimal, InvalidOperation
 
-import stripe
 from django.conf import settings
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .models import Payment, PaymentMethod
-from .stripe_utils import (
-    create_payment_intent,
-    create_setup_intent,
-    detach_payment_method,
-    get_or_create_customer,
-)
-from .webhooks import (
-    handle_payment_intent_failed,
-    handle_payment_intent_succeeded,
-    handle_setup_intent_succeeded,
-)
+from .models import Payment
+from .paypal_utils import PayPalError, capture_order, create_order, verify_webhook_signature
+from .services import grant_paypal_credits
 
 logger = logging.getLogger(__name__)
 
@@ -84,32 +74,23 @@ _TIER_MAP = {t['name'].lower(): t for t in PRICING_TIERS}
 # ── Billing home ─────────────────────────────────────────────────────────────
 
 @login_required
-def stripe_config(request):
-    """Return Stripe publishable key as JSON — avoids template caching issues."""
-    return JsonResponse({'publishable_key': settings.STRIPE_PUBLISHABLE_KEY})
-
-
-@login_required
 def billing_home(request):
     recent_payments = Payment.objects.filter(user=request.user).order_by('-created_at')[:10]
     return render(request, 'billing/home.html', {
         'tiers': PRICING_TIERS,
         'recent_payments': recent_payments,
-        'stripe_pk': settings.STRIPE_PUBLISHABLE_KEY,
+        'paypal_client_id': settings.PAYPAL_CLIENT_ID,
     })
 
 
-# ── Create PaymentIntent (AJAX) ───────────────────────────────────────────────
+# ── PayPal: create order (AJAX) ──────────────────────────────────────────────
 
 @login_required
 @require_POST
-def create_payment_intent_view(request):
-    """
-    Called by the frontend to get a client_secret before confirming payment.
-    Returns JSON: {client_secret, payment_intent_id, publishable_key}
-    """
+def create_paypal_order_view(request):
+    """Called by the PayPal button's createOrder callback. Returns {order_id}."""
     try:
-        data      = json.loads(request.body)
+        data = json.loads(request.body)
         tier_name = data.get('tier', '').lower()
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({'error': 'Invalid request body.'}, status=400)
@@ -118,204 +99,142 @@ def create_payment_intent_view(request):
     if not tier:
         return JsonResponse({'error': 'Unknown pricing tier.'}, status=400)
 
+    if not settings.PAYPAL_CLIENT_ID or not settings.PAYPAL_CLIENT_SECRET:
+        return JsonResponse({'error': 'PayPal is not configured.'}, status=503)
+
     try:
-        customer = get_or_create_customer(request.user)
-        pi = create_payment_intent(
+        order = create_order(
             amount_usd=tier['price'],
-            customer_id=customer.id,
-            user_id=request.user.pk,
             tier_name=tier['name'],
             credits=tier['credits'],
+            user_id=request.user.pk,
         )
-        return JsonResponse({
-            'client_secret':      pi.client_secret,
-            'payment_intent_id':  pi.id,
-            'publishable_key':    settings.STRIPE_PUBLISHABLE_KEY,
-        })
-    except stripe.error.StripeError as exc:
-        logger.exception("Stripe error creating PaymentIntent for user %s", request.user.pk)
-        return JsonResponse({'error': str(exc.user_message)}, status=502)
-    except Exception as exc:
-        logger.exception("Unexpected error creating PaymentIntent")
-        return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
+    except PayPalError as exc:
+        logger.exception('PayPal order creation failed for user %s', request.user.pk)
+        return JsonResponse({'error': str(exc)}, status=502)
+
+    return JsonResponse({'order_id': order['id']})
 
 
-# ── Create SetupIntent (AJAX) ─────────────────────────────────────────────────
+# ── PayPal: capture order (AJAX) ─────────────────────────────────────────────
 
 @login_required
 @require_POST
-def create_setup_intent_view(request):
-    """Return a SetupIntent client_secret for saving a card without charging."""
-    try:
-        customer = get_or_create_customer(request.user)
-        si = create_setup_intent(customer.id)
-        return JsonResponse({
-            'client_secret':   si.client_secret,
-            'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
-        })
-    except stripe.error.StripeError as exc:
-        logger.exception("Stripe error creating SetupIntent for user %s", request.user.pk)
-        return JsonResponse({'error': str(exc.user_message)}, status=502)
-    except Exception:
-        logger.exception("Unexpected error creating SetupIntent")
-        return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
-
-
-# ── Delete payment method ─────────────────────────────────────────────────────
-
-@login_required
-@require_POST
-def delete_payment_method(request, pm_id):
-    """Detach from Stripe and delete the local record."""
-    pm = get_object_or_404(PaymentMethod, pk=pm_id, user=request.user)
-
-    try:
-        detach_payment_method(pm.stripe_pm_id)
-    except stripe.error.StripeError as exc:
-        logger.warning("Stripe detach failed for %s: %s", pm.stripe_pm_id, exc)
-        # Still delete locally — card may already be detached on Stripe's side
-
-    was_default = pm.is_default
-    pm.delete()
-
-    # Promote the next card to default if the deleted one was default
-    if was_default:
-        next_pm = PaymentMethod.objects.filter(user=request.user).first()
-        if next_pm:
-            next_pm.is_default = True
-            next_pm.save(update_fields=['is_default'])
-
-    messages.success(request, 'Payment method removed.')
-    return redirect('/accounts/profile/?tab=payments')
-
-
-# ── Set default payment method ────────────────────────────────────────────────
-
-@login_required
-@require_POST
-def set_default_payment_method(request, pm_id):
-    pm = get_object_or_404(PaymentMethod, pk=pm_id, user=request.user)
-    PaymentMethod.objects.filter(user=request.user, is_default=True).update(is_default=False)
-    pm.is_default = True
-    pm.save(update_fields=['is_default'])
-    messages.success(request, f'Card ending in {pm.last4} set as default.')
-    return redirect('/accounts/profile/?tab=payments')
-
-
-# ── Payment complete (frontend callback after confirmCardPayment) ─────────────
-
-@login_required
-@require_POST
-def payment_complete(request):
+def capture_paypal_order_view(request):
     """
-    Called by the frontend immediately after stripe.confirmCardPayment() succeeds.
-    Retrieves the PaymentIntent from Stripe to verify status, then credits the user.
-
-    This is the primary credit-delivery path for local dev (where the Stripe CLI
-    webhook forwarder may not be running).  The webhook handler is kept as a
-    belt-and-suspenders fallback — both are idempotent via the stripe_pi_id
-    unique constraint on Payment.
-
-    Always returns JSON — never HTML — so the frontend can parse the response.
+    Called by the PayPal button's onApprove callback.  Captures the order
+    server-side, verifies it belongs to this user, then credits the account.
+    The webhook remains as a fallback — both paths are idempotent via the
+    unique paypal_order_id.
     """
     try:
-        # ── Parse request ────────────────────────────────────────────────
-        try:
-            data = json.loads(request.body)
-            pi_id = data.get('payment_intent_id', '').strip()
-        except (json.JSONDecodeError, AttributeError):
-            return JsonResponse({'error': 'Invalid request body.'}, status=400)
+        data = json.loads(request.body)
+        order_id = data.get('order_id', '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid request body.'}, status=400)
 
-        if not pi_id or not pi_id.startswith('pi_'):
-            return JsonResponse({'error': 'Invalid payment_intent_id.'}, status=400)
+    if not order_id:
+        return JsonResponse({'error': 'Missing order_id.'}, status=400)
 
-        # ── Retrieve & verify PaymentIntent from Stripe ──────────────────
-        try:
-            pi = stripe.PaymentIntent.retrieve(pi_id)
-        except stripe.error.StripeError as exc:
-            logger.exception("Could not retrieve PaymentIntent %s", pi_id)
-            msg = getattr(exc, 'user_message', None) or str(exc)
-            return JsonResponse({'error': msg}, status=502)
+    try:
+        order = capture_order(order_id)
+    except PayPalError as exc:
+        logger.exception('PayPal capture failed for order %s', order_id)
+        return JsonResponse({'error': str(exc)}, status=502)
 
-        import json as _json
-        pi_dict = _json.loads(str(pi))   # normalise StripeObject → plain dict
+    try:
+        unit = order['purchase_units'][0]
+        capture = unit['payments']['captures'][0]
+    except (KeyError, IndexError):
+        return JsonResponse({'error': 'Payment not completed yet.'}, status=402)
 
-        if pi_dict.get('status') != 'succeeded':
-            return JsonResponse(
-                {'error': f"Payment not completed (status: {pi_dict.get('status')})."},
-                status=402,
-            )
+    custom_id = capture.get('custom_id') or unit.get('custom_id') or ''
+    try:
+        user_id, credits, _tier = custom_id.split(':', 2)
+        user_id, credits = int(user_id), int(credits)
+    except ValueError:
+        logger.error('PayPal order %s has malformed custom_id %r', order_id, custom_id)
+        return JsonResponse({'error': 'Order metadata invalid. Contact support.'}, status=400)
 
-        # ── Verify the PI belongs to this user ───────────────────────────
-        user_id_meta = pi_dict.get('metadata', {}).get('user_id')
-        if str(user_id_meta) != str(request.user.pk):
-            logger.warning(
-                "payment_complete: PI %s metadata user_id=%s != request user %s",
-                pi_id, user_id_meta, request.user.pk,
-            )
-            return JsonResponse({'error': 'Payment does not belong to your account.'}, status=403)
+    if user_id != request.user.pk:
+        logger.warning('PayPal order %s user_id=%s != request user %s',
+                       order_id, user_id, request.user.pk)
+        return JsonResponse({'error': 'Payment does not belong to your account.'}, status=403)
 
-        # ── Credit the account (idempotent) ─────────────────────────────
-        handle_payment_intent_succeeded(pi_dict)
+    if capture.get('status') != 'COMPLETED':
+        # e.g. an eCheck still clearing — the webhook will credit when it completes
+        return JsonResponse({
+            'error': f"Payment is {capture.get('status', 'processing').lower()} — "
+                     'credits will be added automatically once it clears.',
+        }, status=402)
 
-        # ── Return updated balance ───────────────────────────────────────
-        request.user.refresh_from_db()
-        return JsonResponse({'ok': True, 'credits': request.user.credits})
+    try:
+        amount = Decimal(capture['amount']['value'])
+    except (KeyError, InvalidOperation):
+        logger.error('PayPal order %s capture has no valid amount', order_id)
+        return JsonResponse({'error': 'Order amount invalid. Contact support.'}, status=400)
 
-    except Exception:
-        logger.exception("Unhandled error in payment_complete for user %s", request.user.pk)
-        return JsonResponse({'error': 'An unexpected error occurred. Contact support.'}, status=500)
+    grant_paypal_credits(order['id'], user_id, credits, amount)
+
+    request.user.refresh_from_db()
+    return JsonResponse({'ok': True, 'credits': request.user.credits})
 
 
-# ── Stripe Webhook ────────────────────────────────────────────────────────────
+# ── PayPal webhook ───────────────────────────────────────────────────────────
 
 @csrf_exempt
-def stripe_webhook(request):
+def paypal_webhook(request):
     """
-    Receives and verifies Stripe webhook events.
-    Must be excluded from CSRF middleware (Stripe signs requests itself).
+    Fallback credit-delivery path.  Signature-verified against PAYPAL_WEBHOOK_ID
+    via PayPal's verification API — unverifiable deliveries are rejected.
     """
-    payload    = request.body
-    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
-
-    if not settings.STRIPE_WEBHOOK_SECRET:
-        logger.warning("STRIPE_WEBHOOK_SECRET not set — skipping signature verification")
-        try:
-            event = json.loads(payload)
-        except json.JSONDecodeError:
-            return HttpResponse(status=400)
-    else:
-        try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-            )
-        except stripe.error.SignatureVerificationError:
-            logger.warning("Stripe webhook signature verification failed")
-            return HttpResponse(status=400)
-        except Exception:
-            return HttpResponse(status=400)
-
-    event_type = event['type']
-    data_obj   = event['data']['object']
-
-    logger.info("Stripe webhook received: %s", event_type)
+    if request.method != 'POST':
+        return HttpResponse(status=405)
 
     try:
-        if event_type == 'payment_intent.succeeded':
-            handle_payment_intent_succeeded(data_obj)
+        event = json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse(status=400)
 
-        elif event_type == 'payment_intent.payment_failed':
-            handle_payment_intent_failed(data_obj)
+    if not settings.PAYPAL_WEBHOOK_ID:
+        logger.error('PAYPAL_WEBHOOK_ID not set — rejecting PayPal webhook')
+        return HttpResponse(status=400)
 
-        elif event_type == 'setup_intent.succeeded':
-            handle_setup_intent_succeeded(data_obj)
+    try:
+        if not verify_webhook_signature(request.headers, event):
+            logger.warning('PayPal webhook signature verification failed')
+            return HttpResponse(status=400)
+    except PayPalError:
+        logger.exception('PayPal webhook verification errored')
+        return HttpResponse(status=400)
 
+    event_type = event.get('event_type', '')
+    logger.info('PayPal webhook received: %s', event_type)
+
+    try:
+        if event_type == 'PAYMENT.CAPTURE.COMPLETED':
+            resource = event.get('resource', {})
+            order_id = (resource.get('supplementary_data', {})
+                                .get('related_ids', {})
+                                .get('order_id'))
+            custom_id = resource.get('custom_id', '')
+            try:
+                user_id, credits, _tier = custom_id.split(':', 2)
+                user_id, credits = int(user_id), int(credits)
+                amount = Decimal(resource['amount']['value'])
+            except (ValueError, KeyError, InvalidOperation):
+                logger.error('PayPal capture webhook missing/malformed data (order %s, custom_id %r)',
+                             order_id, custom_id)
+                return HttpResponse(status=200)
+
+            if order_id:
+                grant_paypal_credits(order_id, user_id, credits, amount)
+            else:
+                logger.error('PayPal capture webhook has no order_id (capture %s)', resource.get('id'))
         else:
-            logger.debug("Unhandled Stripe event: %s", event_type)
-
+            logger.debug('Unhandled PayPal event: %s', event_type)
     except Exception:
-        logger.exception("Error handling Stripe event %s", event_type)
-        # Return 200 so Stripe doesn't keep retrying — we log internally
-        return HttpResponse(status=200)
+        # Log internally; return 200 so PayPal stops retrying a poisoned event
+        logger.exception('Error handling PayPal event %s', event_type)
 
     return HttpResponse(status=200)

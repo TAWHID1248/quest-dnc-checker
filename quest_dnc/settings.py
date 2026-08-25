@@ -208,10 +208,15 @@ SCRUB_MAX_FILE_SIZE_MB = 200        # upload cap shown in UI
 DNC_API_KEY         = config('DNC_API_KEY', default='')
 DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=500, cast=int)
 
-# Stripe
-STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
-STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
-STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')
+# PayPal (Checkout v2 Orders API — one-time credit purchases)
+PAYPAL_CLIENT_ID     = config('PAYPAL_CLIENT_ID', default='')
+PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
+PAYPAL_WEBHOOK_ID    = config('PAYPAL_WEBHOOK_ID', default='')  # from Developer Dashboard webhook config
+PAYPAL_MODE          = config('PAYPAL_MODE', default='sandbox')  # 'sandbox' | 'live'
+PAYPAL_API_BASE = (
+    'https://api-m.paypal.com' if PAYPAL_MODE == 'live'
+    else 'https://api-m.sandbox.paypal.com'
+)
 
 # AppSumo Licensing API (Partner Portal → Redemption step)
 APPSUMO_CLIENT_ID     = config('APPSUMO_CLIENT_ID', default='')

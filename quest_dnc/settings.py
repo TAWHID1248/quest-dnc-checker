@@ -199,6 +199,10 @@ CSRF_TRUSTED_ORIGINS = config(
 # Railway (and most PaaS) terminate SSL at the edge
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Django's default COOP value ('same-origin') severs the window handle to
+# popups, leaving the PayPal checkout popup stuck on about:blank.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 # Scrubber
 SCRUB_BATCH_SIZE = 300_000          # numbers per DNC-check batch
 SCRUB_CONTROL_CHECK_SIZE = 50_000   # chunk size for pause/cancel checks (was 10k)

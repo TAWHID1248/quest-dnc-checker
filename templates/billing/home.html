@@ -42,6 +42,36 @@
     background:#25d366; border:none; color:#0d1117; font-weight:700;
   }
   .btn-whatsapp:hover { background:#1fb457; color:#0d1117; }
+
+  /* PayPal checkout card */
+  .paypal-card {
+    background:#fff;
+    border-radius:12px;
+    padding:1rem 1.1rem .4rem;
+    box-shadow:0 0 0 1px #30363d, 0 10px 30px rgba(0,0,0,.45);
+  }
+  .paypal-card-label {
+    display:flex; align-items:center; justify-content:center; gap:.45rem;
+    font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:#57606a; margin-bottom:.85rem;
+  }
+  .paypal-card-label i { color:#0070ba; font-size:.85rem; }
+  .paypal-card-label::before, .paypal-card-label::after {
+    content:''; flex:1; height:1px; background:#e5e7eb;
+  }
+  .paypal-trust {
+    display:flex; align-items:center; justify-content:center; gap:.45rem;
+    font-size:.75rem; color:#6e7681; margin-top:.75rem; text-align:center;
+  }
+  .paypal-trust i { color:#3fb950; font-size:.8rem; flex-shrink:0; }
+  .checkout-divider {
+    display:flex; align-items:center; gap:.9rem; margin:1.15rem 0 1rem;
+    color:#6e7681; font-size:.75rem; font-weight:600;
+    letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;
+  }
+  .checkout-divider::before, .checkout-divider::after {
+    content:''; flex:1; height:1px; background:#30363d;
+  }
 </style>
 {% endblock %}
 
@@ -161,14 +191,19 @@
 
         {% if paypal_client_id %}
         <!-- ── PayPal checkout ───────────────────── -->
-        <div id="paypal-button-container"></div>
-        <div id="paypal-error" style="display:none;font-size:.82rem;color:#f85149;margin-top:.5rem;"></div>
-
-        <div class="d-flex align-items-center gap-3 my-3">
-          <hr class="flex-grow-1 m-0" style="border-color:#30363d;">
-          <span style="color:#6e7681;font-size:.78rem;white-space:nowrap;">or buy via WhatsApp</span>
-          <hr class="flex-grow-1 m-0" style="border-color:#30363d;">
+        <div class="paypal-card" id="paypal-card">
+          <div class="paypal-card-label">
+            <i class="bi bi-shield-lock-fill"></i>Express Checkout
+          </div>
+          <div id="paypal-button-container"></div>
         </div>
+        <div id="paypal-error" style="display:none;font-size:.82rem;color:#f85149;margin-top:.6rem;text-align:center;"></div>
+        <div class="paypal-trust">
+          <i class="bi bi-lock-fill"></i>
+          Secured by PayPal — pay with your balance or any debit/credit card. Credits are added instantly.
+        </div>
+
+        <div class="checkout-divider">or buy via WhatsApp</div>
         {% endif %}
 
         <!-- ── WhatsApp purchase ─────────────────── -->
@@ -222,7 +257,7 @@
 
 {% block extra_js %}
 {% if paypal_client_id %}
-<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture"></script>
+<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture&disable-funding=paylater,venmo&components=buttons"></script>
 {% endif %}
 <script>
   var WA_NUMBER  = '13472516953';           /* wa.me format: no "+" */
@@ -349,9 +384,14 @@
   }
 
   function renderPayPalButtons() {
-    if (typeof paypal === 'undefined') return;   /* SDK not configured/loaded */
+    var card = document.getElementById('paypal-card');
+    if (typeof paypal === 'undefined') {         /* SDK not configured/loaded */
+      if (card) card.style.display = 'none';
+      return;
+    }
     var container = document.getElementById('paypal-button-container');
     if (!container) return;
+    card.style.display = '';
     container.innerHTML = '';
     document.getElementById('paypal-error').style.display = 'none';
 

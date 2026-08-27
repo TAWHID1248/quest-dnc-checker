@@ -199,10 +199,6 @@ CSRF_TRUSTED_ORIGINS = config(
 # Railway (and most PaaS) terminate SSL at the edge
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Django's default COOP value ('same-origin') severs the window handle to
-# popups, leaving the PayPal checkout popup stuck on about:blank.
-SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
-
 # Scrubber
 SCRUB_BATCH_SIZE = 300_000          # numbers per DNC-check batch
 SCRUB_CONTROL_CHECK_SIZE = 50_000   # chunk size for pause/cancel checks (was 10k)
@@ -211,16 +207,6 @@ SCRUB_MAX_FILE_SIZE_MB = 200        # upload cap shown in UI
 # DNC API
 DNC_API_KEY         = config('DNC_API_KEY', default='')
 DNC_API_CONCURRENCY = config('DNC_API_CONCURRENCY', default=500, cast=int)
-
-# PayPal (Checkout v2 Orders API — one-time credit purchases)
-PAYPAL_CLIENT_ID     = config('PAYPAL_CLIENT_ID', default='')
-PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET', default='')
-PAYPAL_WEBHOOK_ID    = config('PAYPAL_WEBHOOK_ID', default='')  # from Developer Dashboard webhook config
-PAYPAL_MODE          = config('PAYPAL_MODE', default='sandbox')  # 'sandbox' | 'live'
-PAYPAL_API_BASE = (
-    'https://api-m.paypal.com' if PAYPAL_MODE == 'live'
-    else 'https://api-m.sandbox.paypal.com'
-)
 
 # AppSumo Licensing API (Partner Portal → Redemption step)
 APPSUMO_CLIENT_ID     = config('APPSUMO_CLIENT_ID', default='')

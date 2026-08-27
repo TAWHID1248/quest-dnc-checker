@@ -26,39 +26,6 @@
     background:#25d366; border:none; color:#0d1117; font-weight:700;
   }
   .btn-whatsapp:hover { background:#1fb457; color:#0d1117; }
-
-  /* PayPal checkout card */
-  .paypal-card {
-    background:#161b22;
-    border:1px solid #30363d;
-    border-radius:12px;
-    padding:1rem 1.1rem .4rem;
-  }
-  .paypal-card-label {
-    display:flex; align-items:center; justify-content:center; gap:.45rem;
-    font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
-    color:#8b949e; margin-bottom:.85rem;
-  }
-  .paypal-card-label i { color:#3b82f6; font-size:.85rem; }
-  .paypal-card-label::before, .paypal-card-label::after {
-    content:''; flex:1; height:1px; background:#30363d;
-  }
-  /* The page's dark color-scheme forces cross-origin iframes onto an opaque
-     white canvas; declaring light here keeps PayPal's iframe transparent. */
-  #paypal-button-container, #paypal-button-container iframe { color-scheme: light; }
-  .paypal-trust {
-    display:flex; align-items:center; justify-content:center; gap:.45rem;
-    font-size:.75rem; color:#6e7681; margin-top:.75rem; text-align:center;
-  }
-  .paypal-trust i { color:#3fb950; font-size:.8rem; flex-shrink:0; }
-  .checkout-divider {
-    display:flex; align-items:center; gap:.9rem; margin:1.15rem 0 1rem;
-    color:#6e7681; font-size:.75rem; font-weight:600;
-    letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;
-  }
-  .checkout-divider::before, .checkout-divider::after {
-    content:''; flex:1; height:1px; background:#30363d;
-  }
 </style>
 {% endblock %}
 
@@ -166,8 +133,6 @@
 
       <div class="modal-body p-4">
 
-        <div id="purchase-flow">
-
         <!-- Order summary -->
         <div class="p-3 rounded mb-4 text-center" style="background:#161b22;border:1px solid #21262d;">
           <div id="modal-tier-name" style="font-size:.78rem;color:#6e7681;text-transform:uppercase;letter-spacing:.06em;font-weight:600;"></div>
@@ -175,23 +140,6 @@
           <div style="color:#6e7681;font-size:.78rem;">credits</div>
           <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
-
-        {% if paypal_client_id %}
-        <!-- ── PayPal checkout ───────────────────── -->
-        <div class="paypal-card" id="paypal-card">
-          <div class="paypal-card-label">
-            <i class="bi bi-shield-lock-fill"></i>Express Checkout
-          </div>
-          <div id="paypal-button-container"></div>
-        </div>
-        <div id="paypal-error" style="display:none;font-size:.82rem;color:#f85149;margin-top:.6rem;text-align:center;"></div>
-        <div class="paypal-trust">
-          <i class="bi bi-lock-fill"></i>
-          Secured by PayPal — pay with your balance or any debit/credit card. Credits are added instantly.
-        </div>
-
-        <div class="checkout-divider">or buy via WhatsApp</div>
-        {% endif %}
 
         <!-- ── WhatsApp purchase ─────────────────── -->
         <a id="wa-chat-btn" class="btn btn-whatsapp w-100 fw-semibold py-2" href="#" target="_blank" rel="noopener">
@@ -204,20 +152,6 @@
           message so we can credit the right account.
         </div>
 
-        </div><!-- /#purchase-flow -->
-
-        <!-- ── Purchase success ──────────────────── -->
-        <div id="purchase-success" style="display:none;text-align:center;padding:1rem 0;">
-          <div style="font-size:2.5rem;">✅</div>
-          <h6 class="fw-bold mt-2 mb-1" style="color:#e6edf3;">Payment Successful!</h6>
-          <p style="color:#6e7681;font-size:.875rem;margin-bottom:.25rem;">Credits have been added to your account.</p>
-          <div style="font-size:1.6rem;font-weight:800;color:#3fb950;" id="success-balance"></div>
-          <div style="color:#6e7681;font-size:.78rem;margin-bottom:1rem;">new balance</div>
-          <button class="btn btn-outline-success w-100" onclick="location.reload()">
-            <i class="bi bi-arrow-clockwise me-1"></i>Done
-          </button>
-        </div>
-
       </div>
     </div>
   </div>
@@ -225,17 +159,9 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if paypal_client_id %}
-<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD&intent=capture&disable-funding=paylater,venmo&components=buttons"></script>
-{% endif %}
 <script>
   var WA_NUMBER  = '13472516953';           /* wa.me format: no "+" */
   var USER_EMAIL = '{{ user.email|escapejs }}';
-
-  var PAYPAL_CREATE_URL  = '{% url "billing:paypal_create_order" %}';
-  var PAYPAL_CAPTURE_URL = '{% url "billing:paypal_capture_order" %}';
-  var CSRF_TOKEN         = '{{ csrf_token }}';
-  var currentTier        = null;
 
   /* ── Open modal (pure JS, no Bootstrap.Modal dependency) ── */
   function openPurchaseModal(btn) {
@@ -244,16 +170,10 @@
       price:   btn.getAttribute('data-price'),
       credits: btn.getAttribute('data-credits'),
     };
-    currentTier = tier;
 
     document.getElementById('modal-tier-name').textContent = tier.name + ' Plan';
     document.getElementById('modal-credits').textContent   = tier.credits;
     document.getElementById('modal-price').textContent     = '$' + tier.price;
-
-    /* reset to the purchase view and (re)render PayPal buttons */
-    document.getElementById('purchase-flow').style.display = '';
-    document.getElementById('purchase-success').style.display = 'none';
-    renderPayPalButtons();
 
     var msg = 'Hi! I want to buy the ' + tier.name + ' plan (' + tier.credits +
               ' credits) for $' + tier.price + '. My account email: ' + USER_EMAIL;
@@ -289,67 +209,6 @@
       document.body.style.overflow = '';
       if (bd) bd.remove();
     }, 200);
-  }
-
-  /* ── PayPal checkout ── */
-  function showPayPalError(msg) {
-    var el = document.getElementById('paypal-error');
-    if (!el) return;
-    el.textContent = msg;
-    el.style.display = 'block';
-  }
-
-  function showPurchaseSuccess(newBalance) {
-    document.getElementById('purchase-flow').style.display = 'none';
-    document.getElementById('purchase-success').style.display = 'block';
-    document.getElementById('success-balance').textContent =
-      Math.round(newBalance).toLocaleString() + ' credits';
-  }
-
-  function postJSON(url, body) {
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-      body: JSON.stringify(body),
-    }).then(function(res) {
-      return res.json().then(function(data) {
-        if (!res.ok || data.error) throw new Error(data.error || 'Request failed.');
-        return data;
-      });
-    });
-  }
-
-  function renderPayPalButtons() {
-    var card = document.getElementById('paypal-card');
-    if (typeof paypal === 'undefined') {         /* SDK not configured/loaded */
-      if (card) card.style.display = 'none';
-      return;
-    }
-    var container = document.getElementById('paypal-button-container');
-    if (!container) return;
-    card.style.display = '';
-    container.innerHTML = '';
-    document.getElementById('paypal-error').style.display = 'none';
-
-    paypal.Buttons({
-      style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 45 },
-
-      createOrder: function() {
-        return postJSON(PAYPAL_CREATE_URL, { tier: currentTier.name })
-          .then(function(data) { return data.order_id; })
-          .catch(function(err) { showPayPalError(err.message); throw err; });
-      },
-
-      onApprove: function(data) {
-        return postJSON(PAYPAL_CAPTURE_URL, { order_id: data.orderID })
-          .then(function(res) { showPurchaseSuccess(res.credits); })
-          .catch(function(err) { showPayPalError(err.message); });
-      },
-
-      onError: function() {
-        showPayPalError('Something went wrong with PayPal. Please try again.');
-      },
-    }).render('#paypal-button-container');
   }
 
   document.addEventListener('DOMContentLoaded', function() {

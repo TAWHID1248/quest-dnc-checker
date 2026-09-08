@@ -214,6 +214,9 @@ APPSUMO_CLIENT_SECRET = config('APPSUMO_CLIENT_SECRET', default='')
 APPSUMO_API_KEY       = config('APPSUMO_API_KEY', default='')  # signs webhooks + Licensing API auth
 
 # Credits granted per AppSumo tier, e.g. "1:100000,2:250000,3:1000000"
+# Free credits granted automatically to every new account at signup.
+SIGNUP_FREE_CREDITS = config('SIGNUP_FREE_CREDITS', default=10_000, cast=int)
+
 APPSUMO_TIER_CREDITS = {
     int(tier): int(amount)
     for tier, amount in (

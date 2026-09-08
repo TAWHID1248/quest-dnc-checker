@@ -2,6 +2,7 @@ import logging
 
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Sum, Count, Q
@@ -53,17 +54,30 @@ def register_view(request):
                 form.add_error('promo_code', 'Invalid promo code. Please check and try again.')
                 return render(request, 'accounts/register.html', {'form': form})
 
+        signup_credits = settings.SIGNUP_FREE_CREDITS
+        promo_credits = 100_000 if promo_code_obj else 0
+
         with transaction.atomic():
             user = form.save()
-            if promo_code_obj:
-                user.credits += 100_000
-                user.save(update_fields=['credits'])
+            if signup_credits:
+                user.credits += signup_credits
                 CreditTransaction.objects.create(
                     user=user,
                     type=CreditTransaction.Type.ADJUSTMENT,
-                    amount=100_000,
+                    amount=signup_credits,
                     price=0,
                 )
+            if promo_code_obj:
+                user.credits += promo_credits
+                CreditTransaction.objects.create(
+                    user=user,
+                    type=CreditTransaction.Type.ADJUSTMENT,
+                    amount=promo_credits,
+                    price=0,
+                )
+            if signup_credits or promo_code_obj:
+                user.save(update_fields=['credits'])
+            if promo_code_obj:
                 promo_code_obj.status = AgentPromoCode.Status.USED
                 promo_code_obj.used_by = user
                 promo_code_obj.used_at = timezone.now()
@@ -72,13 +86,16 @@ def register_view(request):
         if promo_code_obj:
             from agents.utils import generate_next_promo_code
             generate_next_promo_code(promo_code_obj.agent)
-            messages.success(request, 'Account created! 100,000 credits have been added to your account.')
+
+        total_credits = signup_credits + promo_credits
+        if total_credits:
+            messages.success(request, f'Account created! {total_credits:,} free credits have been added to your account.')
         else:
             messages.success(request, 'Account created successfully.')
 
         try:
             from .tasks import send_welcome_email
-            send_welcome_email.delay(user.pk, 100_000 if promo_code_obj else 0)
+            send_welcome_email.delay(user.pk, promo_credits, signup_credits)
         except Exception:
             logger.exception("Failed to queue welcome email for %s", user.email)
 

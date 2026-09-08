@@ -80,7 +80,8 @@ Promo codes for agent referrals. Format: `{LASTNAME4}DNC26{NNNN}` (0001–10000 
 Fields: `agent` (FK→User), `code`, `sequence`, `status` (active/expired/used), `created_at`,
 `expires_at` (created_at + 7 days), `used_by` (FK→User), `used_at`.
 One ACTIVE code per agent at a time. Hourly beat task `expire_promo_codes` auto-rotates codes.
-Applying a valid code at signup credits the new client with 100,000 credits.
+Applying a valid code at signup credits the new client with 100,000 credits (on top of the
+10,000 free signup credits every new account receives; see `SIGNUP_FREE_CREDITS` in settings).
 
 ### `scrubber.ScrubJob`
 One file-scrub request. Fields: `job_id` (SCR-XXXXXXXX), `user`, `filename`, `file`,

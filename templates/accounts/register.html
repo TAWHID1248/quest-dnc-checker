@@ -2,14 +2,15 @@
 {% block title %}Create Account — CheckDNC{% endblock %}
 
 {% block content %}
-<h5 class="text-center mb-4 fw-semibold" style="color:#e6edf3;">Create your account</h5>
+<h5 class="text-center mb-2 fw-semibold" style="color:#e6edf3;">Create your account</h5>
+<p class="text-center mb-4" style="color:#8b949e;font-size:.85rem;">Sign up and get <strong style="color:#e6edf3;">10,000 free credits</strong> instantly.</p>
 
 <form method="post" novalidate>
   {% csrf_token %}
   {% for field in form %}
   {% if field.name == 'promo_code' %}
   <hr class="my-3" style="border-color:#30363d;">
-  <p class="mb-2" style="color:#6e7681;font-size:.8rem;">Have an agent promo code? Enter it below to receive 100,000 free credits.</p>
+  <p class="mb-2" style="color:#6e7681;font-size:.8rem;">Have an agent promo code? Enter it below to receive an extra 100,000 free credits.</p>
   {% endif %}
   <div class="mb-3">
     <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}{% if not field.field.required %} <span style="color:#6e7681;font-size:.75rem;">(optional)</span>{% endif %}</label>

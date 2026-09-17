@@ -72,6 +72,31 @@
     .btn-primary { background-color: #3b82f6; border-color: #3b82f6; }
     .btn-primary:hover { background-color: #2563eb; border-color: #2563eb; }
     .divider { color: #6e7681; font-size: 0.8rem; }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: #6e7681;
+      font-size: 0.8rem;
+      margin: 1.25rem 0;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid #30363d;
+    }
+    .btn-google {
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      color: #1f2328;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+    }
+    .btn-google:hover { background: #f3f4f6; border-color: #d0d7de; color: #1f2328; }
+    .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
     .auth-footer { font-size: 0.8rem; color: #6e7681; text-align: center; margin-top: 1rem; }
     .auth-footer a { color: #3b82f6; text-decoration: none; }
     .password-wrap { position: relative; }

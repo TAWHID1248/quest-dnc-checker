@@ -56,6 +56,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'quest_dnc.context_processors.dnc_last_updated',
+                'quest_dnc.context_processors.google_auth',
             ],
         },
     },
@@ -213,10 +214,17 @@ APPSUMO_CLIENT_ID     = config('APPSUMO_CLIENT_ID', default='')
 APPSUMO_CLIENT_SECRET = config('APPSUMO_CLIENT_SECRET', default='')
 APPSUMO_API_KEY       = config('APPSUMO_API_KEY', default='')  # signs webhooks + Licensing API auth
 
-# Credits granted per AppSumo tier, e.g. "1:100000,2:250000,3:1000000"
+# Google OAuth 2.0 ("Sign in with Google"). Create a Web application client at
+# https://console.cloud.google.com/apis/credentials and add
+# https://<your-host>/accounts/google/callback/ as an authorised redirect URI.
+# Leave GOOGLE_CLIENT_ID empty to hide the Google buttons.
+GOOGLE_CLIENT_ID     = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+
 # Free credits granted automatically to every new account at signup.
 SIGNUP_FREE_CREDITS = config('SIGNUP_FREE_CREDITS', default=10_000, cast=int)
 
+# Credits granted per AppSumo tier, e.g. "1:100000,2:250000,3:1000000"
 APPSUMO_TIER_CREDITS = {
     int(tier): int(amount)
     for tier, amount in (
@@ -271,6 +279,11 @@ LOGGING = {
             'propagate': False,
         },
         'agents': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'accounts': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

@@ -12,6 +12,10 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('profile/', views.profile_view, name='profile'),
 
+    # Google OAuth 2.0 sign-in / sign-up
+    path('google/', views.google_login, name='google_login'),
+    path('google/callback/', views.google_callback, name='google_callback'),
+
     # Password reset flow (Django built-in views, custom templates)
     path('password-reset/', auth_views.PasswordResetView.as_view(
         template_name='accounts/password_reset.html',

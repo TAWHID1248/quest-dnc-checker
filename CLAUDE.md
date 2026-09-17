@@ -17,7 +17,7 @@ A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. 
 | Cache | Redis 7 |
 | Static files | WhiteNoise (dev/Railway) / Nginx (Docker) |
 | Payments | Manual WhatsApp flow + admin credit grants (Stripe & PayPal removed Aug 2026) |
-| Auth | Django sessions, custom `accounts.CustomUser` (email-based) |
+| Auth | Django sessions, custom `accounts.CustomUser` (email-based); optional Google OAuth 2.0 sign-in/sign-up (`accounts/views.py` `google_login`/`google_callback`, hand-rolled with `requests`) |
 | Deployment | Railway (primary), Docker + Nginx (self-hosted) |
 
 ---
@@ -166,6 +166,7 @@ See `.env.example`. Critical vars:
 | `DEBUG` | Set `False` in production |
 | `ALLOWED_HOSTS` | Comma-separated hostnames |
 | `CSRF_TRUSTED_ORIGINS` | Comma-separated HTTPS origins |
+| `GOOGLE_CLIENT_ID/SECRET` | Google OAuth web client; empty ID hides the "Continue with Google" buttons. Redirect URI: `/accounts/google/callback/` |
 
 ---
 
@@ -244,6 +245,16 @@ App `appsumo/` implements the AppSumo Licensing API (docs.licensing.appsumo.com)
   license granted. Env vars: `APPSUMO_CLIENT_ID`, `APPSUMO_CLIENT_SECRET`, `APPSUMO_API_KEY`.
 
 ---
+
+## Google sign-in
+
+`GET /accounts/google/` stores a CSRF `state` (+ optional `?promo=` code and safe `?next=`)
+in the session and redirects to Google. `GET /accounts/google/callback/` verifies the state,
+exchanges the code server-side, fetches userinfo, and requires `email_verified`.
+Existing users (matched by email, case-insensitive) are logged in; new users are created with
+an unusable password and go through the same `accounts/services.py` signup path as the
+register form (free credits, promo bonus, welcome email). A bad promo code produces a warning
+rather than blocking the Google signup.
 
 ## Admin access
 

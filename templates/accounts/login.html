@@ -32,6 +32,8 @@
   <button type="submit" class="btn btn-primary w-100 fw-semibold">Sign in</button>
 </form>
 
+{% include "accounts/_google_button.html" with google_label="Sign in with Google" %}
+
 <div class="auth-footer mt-3">
   Don't have an account? <a href="{% url 'accounts:register' %}">Create one</a>
 </div>

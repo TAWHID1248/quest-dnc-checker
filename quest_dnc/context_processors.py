@@ -12,3 +12,8 @@ def dnc_last_updated(request):
         .first()
     )
     return {'dnc_last_updated': last}
+
+
+def google_auth(request):
+    from django.conf import settings
+    return {'google_auth_enabled': bool(settings.GOOGLE_CLIENT_ID)}

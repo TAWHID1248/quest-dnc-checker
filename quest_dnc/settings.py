@@ -214,6 +214,15 @@ APPSUMO_CLIENT_ID     = config('APPSUMO_CLIENT_ID', default='')
 APPSUMO_CLIENT_SECRET = config('APPSUMO_CLIENT_SECRET', default='')
 APPSUMO_API_KEY       = config('APPSUMO_API_KEY', default='')  # signs webhooks + Licensing API auth
 
+# Stripe (hosted Checkout for credit purchases). Use pk_test_/sk_test_ keys
+# for the sandbox and pk_live_/sk_live_ for production. Leaving the keys
+# empty hides the "Card" option in the purchase modal.
+# Webhook endpoint: https://<your-host>/billing/webhook/
+# (event: checkout.session.completed) — its signing secret is STRIPE_WEBHOOK_SECRET.
+STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
+STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')
+
 # Google OAuth 2.0 ("Sign in with Google"). Create a Web application client at
 # https://console.cloud.google.com/apis/credentials and add
 # https://<your-host>/accounts/google/callback/ as an authorised redirect URI.

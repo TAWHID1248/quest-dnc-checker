@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased via a manual WhatsApp flow (message support, admin grants credits). (Stripe and PayPal checkout were both removed in Aug 2026.)
+A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased by card via hosted Stripe Checkout (re-added Sep 2026) or via a manual WhatsApp flow (message support, admin grants credits). PayPal was removed in Aug 2026.
 
 ---
 
@@ -16,7 +16,7 @@ A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. 
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
 | Static files | WhiteNoise (dev/Railway) / Nginx (Docker) |
-| Payments | Manual WhatsApp flow + admin credit grants (Stripe & PayPal removed Aug 2026) |
+| Payments | Stripe hosted Checkout (card) + manual WhatsApp flow / admin credit grants (PayPal removed Aug 2026) |
 | Auth | Django sessions, custom `accounts.CustomUser` (email-based); optional Google OAuth 2.0 sign-in/sign-up (`accounts/views.py` `google_login`/`google_callback`, hand-rolled with `requests`) |
 | Deployment | Railway (primary), Docker + Nginx (self-hosted) |
 
@@ -34,6 +34,9 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 ├── admin_panel/            ← Internal admin dashboard (client/ticket/payment mgmt)
 ├── api/                    ← Vercel WSGI wrapper (api/index.py)
 ├── billing/                ← Credits: pricing tiers, payment/credit-ledger models, billing page
+│   ├── stripe_utils.py     ← All Stripe SDK calls (customer, Checkout Session, webhook verify)
+│   ├── services.py         ← fulfil_checkout_session(): idempotent credit grant + Invoice email
+│   └── views.py            ← billing_home, create_checkout, checkout_success/cancel, stripe_webhook
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
 │   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
 │   ├── phone.py            ← Phone normalisation + file parsing
@@ -92,9 +95,13 @@ One file-scrub request. Fields: `job_id` (SCR-XXXXXXXX), `user`, `filename`, `fi
 Immutable credit ledger. Type: PURCHASE | USAGE | REFUND | ADJUSTMENT. `amount` is
 negative for USAGE (consumed credits).
 
+### `billing.Payment`
+One purchase. `provider` STRIPE | PAYPAL (legacy) | MANUAL. `stripe_session_id` (unique) is the
+idempotency key for Checkout fulfilment; `stripe_pi_id` is the PaymentIntent.
+
 ### `billing.PaymentMethod`
-Legacy stored payment cards from the removed Stripe integration. Model kept for
-historical Payment/CreditTransaction FKs; no UI creates new records.
+Legacy stored cards from the original (Elements-based) Stripe integration. Model kept for
+historical Payment/CreditTransaction FKs; hosted Checkout does not create new records.
 
 ---
 
@@ -218,12 +225,23 @@ celery -A quest_dnc beat --loglevel=info \
 
 - Credit tiers: Starter $10→100K, Professional $20→250K, Enterprise $50→1M
   (defined in `PRICING_TIERS`, `billing/views.py`)
-- Purchases are manual: the pricing modal opens a prefilled WhatsApp chat
-  (tier, price, account email); an admin then grants credits via the admin panel.
-- Historical Stripe/PayPal IDs remain on `Payment.stripe_pi_id`,
-  `Payment.paypal_order_id`, `PaymentMethod.stripe_pm_id`, and
-  `CustomUser.stripe_customer_id` — display-only legacy data (Stripe and
-  PayPal both removed Aug 2026).
+- **Card (Stripe hosted Checkout):** the modal's "Pay with Card" button POSTs the tier name to
+  `/billing/checkout/`; `create_checkout_session` builds a one-off `mode=payment` session with
+  `price_data` from `PRICING_TIERS` (prices are never trusted from the browser) and redirects to
+  Stripe. Metadata carries `user_id`, `tier_name`, `credits`.
+  - Fulfilment is `billing/services.py::fulfil_checkout_session`, called from the webhook
+    (`POST /billing/webhook/`, event `checkout.session.completed`) **and** from the
+    success page (`/billing/checkout/success/?session_id=`) as a fallback. It is idempotent on
+    `Payment.stripe_session_id`, uses `SELECT FOR UPDATE` on the user, writes Payment +
+    CreditTransaction(PURCHASE) + Invoice, and queues the invoice email via Celery.
+  - The success page verifies `client_reference_id` matches the logged-in user before fulfilling.
+  - Env: `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. With the keys
+    empty the modal shows the Card option as "Coming soon". Sandbox = `pk_test_/sk_test_` keys.
+  - Local webhook testing: `stripe listen --forward-to localhost:8000/billing/webhook/`.
+  - Tests: `billing/tests.py` (Stripe SDK mocked; run with a SQLite settings override).
+- **Manual:** the modal also offers a prefilled WhatsApp chat (tier, price, account email);
+  an admin then grants credits via the admin panel.
+- `Payment.paypal_order_id` and `PaymentMethod.stripe_pm_id` are display-only legacy data.
 
 ---
 

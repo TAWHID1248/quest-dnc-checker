@@ -163,10 +163,13 @@ class Payment(models.Model):
         related_name='payments',
     )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    # STRIPE and PAYPAL are legacy providers (both integrations removed);
-    # the default keeps pre-PayPal rows labelled correctly.
+    # PAYPAL is a legacy provider (integration removed Aug 2026).
     provider = models.CharField(max_length=20, choices=Provider.choices, default=Provider.STRIPE)
-    stripe_pi_id = models.CharField(max_length=255, blank=True, help_text='Legacy Stripe PaymentIntent ID')
+    stripe_pi_id = models.CharField(max_length=255, blank=True, help_text='Stripe PaymentIntent ID')
+    stripe_session_id = models.CharField(
+        max_length=255, unique=True, null=True, blank=True,
+        help_text='Stripe Checkout Session ID (idempotency key for credit grants)',
+    )
     paypal_order_id = models.CharField(
         max_length=255, unique=True, null=True, blank=True,
         help_text='Legacy PayPal Order ID (PayPal removed Aug 2026)',

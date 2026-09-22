@@ -27,6 +27,17 @@
   }
   .btn-whatsapp:hover { background:#1fb457; color:#0d1117; }
 
+  /* Card checkout (Stripe) */
+  .btn-card-pay {
+    display:flex; align-items:center; justify-content:center; gap:.6rem;
+    width:100%; padding:.65rem 1rem; margin-bottom:.75rem;
+    background:#3b82f6; border:1px solid #3b82f6; border-radius:8px;
+    color:#fff; font-weight:700; font-size:.9rem;
+  }
+  .btn-card-pay:hover { background:#2f6fd6; border-color:#2f6fd6; color:#fff; }
+  .btn-card-pay i { font-size:1.05rem; }
+  .pay-divider { text-align:center; font-size:.72rem; color:#6e7681; margin:.25rem 0 .9rem; letter-spacing:.06em; text-transform:uppercase; }
+
   /* Coming-soon payment options */
   .pay-option {
     display:flex; align-items:center; justify-content:center; gap:.6rem;
@@ -155,15 +166,30 @@
           <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
 
-        <!-- ── Payment options (coming soon) ─────── -->
-        <div class="pay-option">
-          <i class="bi bi-paypal"></i>PayPal
-          <span class="soon-badge">Coming soon</span>
-        </div>
+        <!-- ── Card (Stripe hosted Checkout) ────── -->
+        {% if stripe_enabled %}
+        <form method="post" action="{% url 'billing:create_checkout' %}" id="card-checkout-form">
+          {% csrf_token %}
+          <input type="hidden" name="tier" id="checkout-tier" value="">
+          <button type="submit" class="btn btn-card-pay" id="card-pay-btn">
+            <i class="bi bi-credit-card"></i>Pay with Card
+            <span style="font-weight:500;opacity:.85;font-size:.8rem;">(Visa, Mastercard, Amex)</span>
+          </button>
+        </form>
+        {% else %}
         <div class="pay-option">
           <i class="bi bi-credit-card"></i>Card
           <span class="soon-badge">Coming soon</span>
         </div>
+        {% endif %}
+
+        <!-- ── PayPal (coming soon) ─────────────── -->
+        <div class="pay-option">
+          <i class="bi bi-paypal"></i>PayPal
+          <span class="soon-badge">Coming soon</span>
+        </div>
+
+        {% if stripe_enabled %}<div class="pay-divider">or pay manually</div>{% endif %}
 
         <!-- ── Contact us (WhatsApp) ─────────────── -->
         <a id="wa-chat-btn" class="btn btn-whatsapp w-100 fw-semibold py-2" href="#" target="_blank" rel="noopener">
@@ -198,6 +224,8 @@
     document.getElementById('modal-tier-name').textContent = tier.name + ' Plan';
     document.getElementById('modal-credits').textContent   = tier.credits;
     document.getElementById('modal-price').textContent     = '$' + tier.price;
+    var tierInput = document.getElementById('checkout-tier');
+    if (tierInput) tierInput.value = tier.name;
 
     var msg = 'Hi! I want to buy the ' + tier.name + ' plan (' + tier.credits +
               ' credits) for $' + tier.price + '. My account email: ' + USER_EMAIL;
@@ -237,6 +265,14 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('modal-close-btn').addEventListener('click', closePurchaseModal);
+    var form = document.getElementById('card-checkout-form');
+    if (form) {
+      form.addEventListener('submit', function() {
+        var btn = document.getElementById('card-pay-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Redirecting to secure checkout…';
+      });
+    }
   });
 </script>
 {% endblock %}

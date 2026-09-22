@@ -1,29 +1,74 @@
-{# Floating WhatsApp chat button — bottom-right on every page. Included by base.html and base_auth.html. #}
+{# Floating WhatsApp chat button — bottom-right on every page. Included by base.html and base_auth.html.
+   Animated like the reference: WhatsApp logo ⇄ chat bubble with typing dots, with a shine sweep. #}
 <style>
   .wa-fab {
-    position: fixed; right: 20px; bottom: 20px; z-index: 1040;
-    display: flex; align-items: center; gap: .55rem;
-    height: 56px; padding: 0 18px 0 14px; border-radius: 28px;
-    background: #25d366; color: #0d1117; text-decoration: none;
-    font-weight: 700; font-size: .9rem; line-height: 1;
-    box-shadow: 0 6px 20px rgba(37, 211, 102, .35), 0 2px 6px rgba(0,0,0,.4);
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    position: fixed; right: 22px; bottom: 22px; z-index: 1040;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #1db954; border: 4px solid #8fe0a4;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none; overflow: hidden;
+    box-shadow: 0 8px 22px rgba(29, 185, 84, .40), 0 2px 6px rgba(0,0,0,.45);
+    transition: transform .15s ease, box-shadow .15s ease;
   }
   .wa-fab:hover, .wa-fab:focus-visible {
-    background: #1fb457; color: #0d1117; transform: translateY(-2px);
-    box-shadow: 0 10px 26px rgba(37, 211, 102, .45), 0 3px 8px rgba(0,0,0,.45);
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 12px 28px rgba(29, 185, 84, .55), 0 3px 8px rgba(0,0,0,.5);
     outline: none;
   }
-  .wa-fab i { font-size: 1.7rem; }
-  .wa-fab .wa-fab-label { white-space: nowrap; }
+  /* shine sweep */
+  .wa-fab::after {
+    content: ""; position: absolute; top: -20%; left: -60%; width: 40%; height: 140%;
+    background: linear-gradient(115deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+    transform: skewX(-20deg);
+    animation: wa-shine 6s ease-in-out infinite;
+  }
+  .wa-fab .wa-layer {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .wa-fab .wa-logo  { animation: wa-show-logo 6s ease-in-out infinite; }
+  .wa-fab .wa-bubble{ animation: wa-show-bubble 6s ease-in-out infinite; }
+  .wa-fab .wa-logo i { color: #fff; font-size: 2rem; line-height: 1; }
+  .wa-fab .wa-bubble svg { width: 36px; height: 36px; display: block; }
+  .wa-fab .wa-dot { animation: wa-dot 1.2s ease-in-out infinite; transform-origin: center; }
+  .wa-fab .wa-dot:nth-child(2) { animation-delay: .2s; }
+  .wa-fab .wa-dot:nth-child(3) { animation-delay: .4s; }
+
+  @keyframes wa-show-logo {
+    0%, 38%   { opacity: 1; transform: scale(1); }
+    45%, 88%  { opacity: 0; transform: scale(.4); }
+    95%, 100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes wa-show-bubble {
+    0%, 38%   { opacity: 0; transform: scale(.4); }
+    45%, 88%  { opacity: 1; transform: scale(1); }
+    95%, 100% { opacity: 0; transform: scale(.4); }
+  }
+  @keyframes wa-dot {
+    0%, 60%, 100% { transform: translateY(0); opacity: .85; }
+    30%           { transform: translateY(-3px); opacity: 1; }
+  }
+  @keyframes wa-shine {
+    0%, 70%   { left: -60%; }
+    85%, 100% { left: 130%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wa-fab::after, .wa-fab .wa-logo, .wa-fab .wa-bubble, .wa-fab .wa-dot { animation: none; }
+    .wa-fab .wa-bubble { opacity: 0; }
+  }
   @media (max-width: 575.98px) {
-    .wa-fab { right: 14px; bottom: 14px; width: 56px; padding: 0; justify-content: center; }
-    .wa-fab .wa-fab-label { display: none; }
+    .wa-fab { right: 14px; bottom: 14px; width: 58px; height: 58px; }
   }
 </style>
 <a class="wa-fab" id="wa-fab"
    href="https://wa.me/13472516953?text={% if user.is_authenticated %}{{ 'Hi! I need help with my CheckDNC account. My account email: '|add:user.email|urlencode }}{% else %}{{ 'Hi! I have a question about CheckDNC.'|urlencode }}{% endif %}"
    target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp" title="Chat with us on WhatsApp">
-  <i class="bi bi-whatsapp"></i>
-  <span class="wa-fab-label">Chat with us</span>
+  <span class="wa-layer wa-logo"><i class="bi bi-whatsapp"></i></span>
+  <span class="wa-layer wa-bubble" aria-hidden="true">
+    <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#fff" d="M20 5c-8.8 0-16 6.3-16 14 0 3.4 1.4 6.5 3.7 8.9L6 34.5l7.2-2.6c2.1.8 4.4 1.2 6.8 1.2 8.8 0 16-6.3 16-14S28.8 5 20 5z"/>
+      <circle class="wa-dot" cx="13.5" cy="19" r="2.3" fill="#1db954"/>
+      <circle class="wa-dot" cx="20"   cy="19" r="2.3" fill="#1db954"/>
+      <circle class="wa-dot" cx="26.5" cy="19" r="2.3" fill="#1db954"/>
+    </svg>
+  </span>
 </a>

@@ -35,7 +35,7 @@ def get_or_create_customer(user):
     if user.stripe_customer_id:
         try:
             customer = stripe.Customer.retrieve(user.stripe_customer_id)
-            if not customer.get('deleted'):
+            if not getattr(customer, 'deleted', False):
                 return customer.id
         except stripe.error.InvalidRequestError:
             logger.warning("Stripe customer %s not found, recreating", user.stripe_customer_id)
@@ -90,16 +90,20 @@ def create_checkout_session(user, tier: dict, success_url: str, cancel_url: str)
     )
 
 
-def retrieve_checkout_session(session_id: str):
-    """Fetch a Checkout Session (used by the success page as a webhook fallback)."""
-    return stripe.checkout.Session.retrieve(session_id)
+def retrieve_checkout_session(session_id: str) -> dict:
+    """
+    Fetch a Checkout Session as a plain dict (used by the success page as a
+    webhook fallback). Stripe SDK objects are not dicts, so convert here.
+    """
+    return stripe.checkout.Session.retrieve(session_id).to_dict()
 
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
 
-def construct_webhook_event(payload: bytes, sig_header: str):
+def construct_webhook_event(payload: bytes, sig_header: str) -> dict:
     """
-    Verify and parse a Stripe webhook event.
+    Verify and parse a Stripe webhook event, returned as a plain dict.
     Raises stripe.error.SignatureVerificationError on an invalid signature.
     """
-    return stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
+    event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
+    return event.to_dict()

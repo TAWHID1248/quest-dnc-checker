@@ -109,6 +109,16 @@ class ViewTests(TestCase):
         self.assertEqual(self.user.credits, 100_000)
         self.assertContains(r, '100,000 credits added')
 
+    def test_success_page_handles_real_sdk_object(self):
+        """retrieve_checkout_session must hand the view a dict even when Stripe returns an SDK object."""
+        sdk_obj = stripe.checkout.Session.construct_from(_session(user_id=self.user.pk), 'sk_test_dummy')
+        with mock.patch('billing.stripe_utils.stripe.checkout.Session.retrieve', return_value=sdk_obj), \
+             mock.patch('billing.services.send_invoice_email_task'):
+            r = self.client.get(reverse('billing:checkout_success') + '?session_id=cs_test_123', follow=True)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.credits, 100_000)
+        self.assertContains(r, '100,000 credits added')
+
     def test_success_page_rejects_other_users_session(self):
         other = User.objects.create_user(email='other@example.com', password='x', name='Other')
         with mock.patch('billing.views.retrieve_checkout_session', return_value=_session(user_id=other.pk)), \

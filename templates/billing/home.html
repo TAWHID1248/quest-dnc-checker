@@ -55,12 +55,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="mb-4">
-  <h4 class="fw-bold mb-1" style="color:#e6edf3;">Buy Credits</h4>
-  <p class="mb-0" style="color:#6e7681;font-size:.875rem;">
-    Credits never expire. Balance:
-    <strong style="color:#3fb950;">{{ user.credits|floatformat:0 }} credits</strong>
-  </p>
+<div class="mb-4 d-flex flex-wrap align-items-start justify-content-between gap-3">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#e6edf3;">Buy Credits</h4>
+    <p class="mb-0" style="color:#6e7681;font-size:.875rem;">
+      Credits never expire. Balance:
+      <strong style="color:#3fb950;">{{ user.credits|floatformat:0 }} credits</strong>
+    </p>
+  </div>
+  <a href="{% url 'billing:invoice_list' %}" class="btn btn-outline-secondary btn-sm fw-semibold">
+    <i class="bi bi-file-earmark-text me-1"></i>My Invoices
+  </a>
 </div>
 
 <!-- ── Pricing tiers ──────────────────────────────────────── -->
@@ -99,8 +104,9 @@
 
 <!-- ── Recent payments ────────────────────────────────────── -->
 <div class="card">
-  <div class="card-header py-3">
+  <div class="card-header py-3 d-flex align-items-center justify-content-between">
     <h6 class="mb-0 fw-semibold">Recent Purchases</h6>
+    <a href="{% url 'billing:invoice_list' %}" style="font-size:.8rem;">All invoices <i class="bi bi-arrow-right"></i></a>
   </div>
   <div class="table-responsive">
     <table class="table mb-0 align-middle" style="font-size:.875rem;">
@@ -111,6 +117,7 @@
           <th class="text-center">Credits</th>
           <th class="text-center">Status</th>
           <th class="text-end">Date</th>
+          <th class="text-end">Invoice</th>
         </tr>
       </thead>
       <tbody>
@@ -131,10 +138,19 @@
             {% endif %}
           </td>
           <td class="text-end" style="color:#6e7681;">{{ p.created_at|date:"M d, Y" }}</td>
+          <td class="text-end">
+            {% if p.invoice %}
+              <a href="{% url 'billing:invoice_pdf' p.invoice.invoice_number %}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.75rem;" title="Download {{ p.invoice.invoice_number }}">
+                <i class="bi bi-download me-1"></i>PDF
+              </a>
+            {% else %}
+              <span style="color:#484f58;">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5" class="text-center py-4" style="color:#6e7681;">
+          <td colspan="6" class="text-center py-4" style="color:#6e7681;">
             <i class="bi bi-receipt fs-2 d-block mb-2"></i>No purchases yet.
           </td>
         </tr>

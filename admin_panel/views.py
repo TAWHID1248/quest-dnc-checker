@@ -256,7 +256,7 @@ def payment_list(request):
     status_filter = request.GET.get('status', '')
     q             = request.GET.get('q', '').strip()
 
-    payments = Payment.objects.select_related('user', 'method').order_by('-created_at')
+    payments = Payment.objects.select_related('user', 'method', 'invoice').order_by('-created_at')
 
     if status_filter:
         payments = payments.filter(status=status_filter)

@@ -95,11 +95,20 @@
 
           <!-- CTA -->
           <tr>
-            <td align="center" style="padding:28px 32px;">
-              <a href="https://app.checkdnc.net/scrubber/"
-                 style="display:inline-block; background-color:#238636; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold; padding:12px 28px; border-radius:6px;">
-                Start Scrubbing
+            <td align="center" style="padding:28px 32px 8px;">
+              <a href="{{ invoice_url }}"
+                 style="display:inline-block; background-color:#0d1117; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold; padding:12px 28px; border-radius:6px; margin:0 6px 10px;">
+                Download Invoice (PDF)
               </a>
+              <a href="{{ invoices_url|default:'https://app.checkdnc.net/billing/invoices/' }}"
+                 style="display:inline-block; background-color:#238636; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold; padding:12px 28px; border-radius:6px; margin:0 6px 10px;">
+                View All Invoices
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 24px; font-size:12px; color:#8b949e;">
+              The PDF is also attached to this email. Invoices stay available in your account under Billing &rarr; Invoices.
             </td>
           </tr>
 

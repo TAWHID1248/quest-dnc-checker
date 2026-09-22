@@ -49,6 +49,7 @@ class FulfilmentTests(TestCase):
         self.assertEqual(CreditTransaction.objects.filter(type='purchase').count(), 1)
         inv = Invoice.objects.get()
         self.assertEqual(inv.amount, Decimal('10.00'))
+        self.assertEqual(inv.payment_id, p1.pk)
         task.delay.assert_called_once_with(inv.pk)
 
     def test_unpaid_session_ignored(self):
@@ -182,3 +183,74 @@ class WebhookTests(TestCase):
         event = {'id': 'evt_2', 'type': 'customer.created', 'data': {'object': {'id': 'cus_1'}}}
         r = self._signed_post(event)
         self.assertEqual(r.status_code, 200)
+
+
+class InvoiceDownloadTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='owner@example.com', password='x', name='Owner')
+        self.other = User.objects.create_user(email='other@example.com', password='x', name='Other')
+        self.payment = Payment.objects.create(
+            user=self.user, amount=Decimal('10.00'), credits=100000,
+            status='completed', provider='stripe', stripe_session_id='cs_inv_1', stripe_pi_id='pi_inv_1',
+        )
+        self.invoice = Invoice.objects.create(
+            user=self.user, payment=self.payment, credits=100000, amount=Decimal('10.00'),
+            notes='Starter plan — 100,000 DNC scrubbing credits',
+        )
+
+    def test_owner_downloads_pdf(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/pdf')
+        self.assertIn(f'attachment; filename="CheckDNC-Invoice-{self.invoice.invoice_number}.pdf"', resp['Content-Disposition'])
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
+    def test_inline_view(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]) + '?view=1')
+        self.assertTrue(resp['Content-Disposition'].startswith('inline;'))
+
+    def test_other_user_gets_404(self):
+        self.client.force_login(self.other)
+        resp = self.client.get(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_admin_can_download_any(self):
+        admin = User.objects.create_user(email='admin@example.com', password='x', role='admin')
+        self.client.force_login(admin)
+        resp = self.client.get(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_anonymous_redirects_to_login(self):
+        resp = self.client.get(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/accounts/login/', resp['Location'])
+
+    def test_invoice_list_shows_only_own(self):
+        Invoice.objects.create(user=self.other, credits=5000, amount=0)
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('billing:invoice_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, self.invoice.invoice_number)
+        self.assertEqual(len(resp.context['invoices']), 1)
+
+    def test_billing_home_links_invoice(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('billing:home'))
+        self.assertContains(resp, reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]))
+
+    def test_admin_grant_invoice_without_payment_renders(self):
+        from .pdf import render_invoice_pdf
+        inv = Invoice.objects.create(user=self.user, credits=5000, amount=0, notes='Goodwill top-up')
+        self.assertTrue(render_invoice_pdf(inv).startswith(b'%PDF'))
+
+    def test_email_attaches_pdf(self):
+        from django.core import mail
+        from .emails import send_credit_invoice_email
+        with self.settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'):
+            self.assertTrue(send_credit_invoice_email(self.invoice))
+            msg = mail.outbox[0]
+        self.assertEqual(msg.attachments[0][0], self.invoice.pdf_filename)
+        self.assertEqual(msg.attachments[0][2], 'application/pdf')
+        self.assertIn(reverse('billing:invoice_pdf', args=[self.invoice.invoice_number]), msg.body)

@@ -95,9 +95,10 @@ def fulfil_checkout_session(session) -> Payment | None:
             invoice = Invoice.objects.create(
                 user=user,
                 transaction=txn,
+                payment=payment,
                 credits=credits,
                 amount=amount,
-                notes=f"{tier_name} plan — card payment {payment.payment_id}".strip(' —'),
+                notes=f"{tier_name} plan — {credits:,} DNC scrubbing credits".strip(' —'),
             )
     except IntegrityError:
         # Webhook and success page raced; the other side won.

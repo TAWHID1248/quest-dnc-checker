@@ -93,7 +93,7 @@ class CreditTransaction(models.Model):
 
 
 class Invoice(models.Model):
-    """Invoice issued to a user when credits are granted by an admin."""
+    """Invoice issued to a user when credits are added (card purchase or admin grant)."""
 
     invoice_number = models.CharField(max_length=20, unique=True, editable=False)
     user = models.ForeignKey(
@@ -106,6 +106,13 @@ class Invoice(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='invoice',
+    )
+    payment = models.OneToOneField(
+        'Payment',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='invoice',
+        help_text='Card payment this invoice was issued for (empty for admin credit grants)',
     )
     credits = models.DecimalField(max_digits=10, decimal_places=2, help_text='Credits granted')
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text='USD amount billed, if applicable')
@@ -134,6 +141,23 @@ class Invoice(models.Model):
         if not self.invoice_number:
             self.invoice_number = _generate_id('INV')
         super().save(*args, **kwargs)
+
+    @property
+    def is_paid_purchase(self):
+        return self.amount > 0
+
+    @property
+    def description(self):
+        """Line-item text shown on the PDF and the invoice list."""
+        if self.notes:
+            return self.notes
+        if self.is_paid_purchase:
+            return 'DNC scrubbing credits'
+        return 'Credits added by CheckDNC support'
+
+    @property
+    def pdf_filename(self):
+        return f"CheckDNC-Invoice-{self.invoice_number}.pdf"
 
 
 class Payment(models.Model):

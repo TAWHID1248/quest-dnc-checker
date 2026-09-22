@@ -108,6 +108,7 @@
           <th class="text-center">Status</th>
           <th>Provider Ref</th>
           <th class="text-end">Date</th>
+          <th class="text-end">Invoice</th>
         </tr>
       </thead>
       <tbody>
@@ -149,10 +150,19 @@
             {{ p.paypal_order_id|default:p.stripe_pi_id|default:"—"|truncatechars:28 }}
           </td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ p.created_at|date:"M d, Y" }}</td>
+          <td class="text-end">
+            {% if p.invoice %}
+              <a href="{% url 'billing:invoice_pdf' p.invoice.invoice_number %}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem;white-space:nowrap;" title="{{ p.invoice.invoice_number }}">
+                <i class="bi bi-download me-1"></i>PDF
+              </a>
+            {% else %}
+              <span style="color:#484f58;">—</span>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center py-5" style="color:#6e7681;">
+          <td colspan="9" class="text-center py-5" style="color:#6e7681;">
             <i class="bi bi-receipt fs-2 d-block mb-2"></i>
             No payments found{% if status_filter %} with status "{{ status_filter }}"{% endif %}{% if q %} matching "{{ q }}"{% endif %}.
           </td>

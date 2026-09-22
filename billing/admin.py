@@ -20,10 +20,11 @@ class CreditTransactionAdmin(admin.ModelAdmin):
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-    list_display = ('invoice_number', 'user', 'credits', 'amount', 'issued_by', 'email_sent', 'created_at')
+    list_display = ('invoice_number', 'user', 'credits', 'amount', 'payment', 'issued_by', 'email_sent', 'created_at')
     list_filter = ('email_sent', 'created_at')
-    search_fields = ('invoice_number', 'user__email')
+    search_fields = ('invoice_number', 'user__email', 'payment__payment_id')
     readonly_fields = ('invoice_number', 'created_at')
+    raw_id_fields = ('user', 'transaction', 'payment', 'issued_by')
     ordering = ('-created_at',)
 
 

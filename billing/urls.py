@@ -6,6 +6,10 @@ app_name = 'billing'
 urlpatterns = [
     path('', views.billing_home, name='home'),
 
+    # Invoices
+    path('invoices/', views.invoice_list, name='invoice_list'),
+    path('invoices/<str:invoice_number>/pdf/', views.invoice_pdf, name='invoice_pdf'),
+
     # Stripe hosted Checkout
     path('checkout/', views.create_checkout, name='create_checkout'),
     path('checkout/success/', views.checkout_success, name='checkout_success'),

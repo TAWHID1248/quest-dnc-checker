@@ -36,7 +36,8 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 ├── billing/                ← Credits: pricing tiers, payment/credit-ledger models, billing page
 │   ├── stripe_utils.py     ← All Stripe SDK calls (customer, Checkout Session, webhook verify)
 │   ├── services.py         ← fulfil_checkout_session(): idempotent credit grant + Invoice email
-│   └── views.py            ← billing_home, create_checkout, checkout_success/cancel, stripe_webhook
+│   ├── pdf.py              ← render_invoice_pdf(): reportlab invoice PDF (rendered on demand, not stored)
+│   └── views.py            ← billing_home, invoice_list/invoice_pdf, create_checkout, checkout_success/cancel, stripe_webhook
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
 │   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
 │   ├── phone.py            ← Phone normalisation + file parsing
@@ -241,6 +242,13 @@ celery -A quest_dnc beat --loglevel=info \
   - Tests: `billing/tests.py` (Stripe SDK mocked; run with a SQLite settings override).
 - **Manual:** the modal also offers a prefilled WhatsApp chat (tier, price, account email);
   an admin then grants credits via the admin panel.
+- **Invoices:** every credit grant creates a `billing.Invoice` (card purchases link it to the
+  `Payment` via `Invoice.payment`, migration 0006; admin grants leave it empty, amount 0).
+  Users download PDFs any time from `/billing/invoices/` (list) and
+  `/billing/invoices/<INV-number>/pdf/` (`?view=1` opens inline); the billing home and admin
+  payments tables link the PDF per payment. Staff can download any invoice, users only their own.
+  The invoice email attaches the same PDF and links to it. Company details on the PDF come from
+  `INVOICE_COMPANY_*` env vars, absolute links from `SITE_URL`.
 - `Payment.paypal_order_id` and `PaymentMethod.stripe_pm_id` are display-only legacy data.
 
 ---

@@ -6,12 +6,13 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .models import Payment
+from .models import Invoice, Payment
+from .pdf import render_invoice_pdf
 from .services import fulfil_checkout_session
 from .stripe_utils import (
     construct_webhook_event,
@@ -83,12 +84,43 @@ def _get_tier(name):
 
 @login_required
 def billing_home(request):
-    recent_payments = Payment.objects.filter(user=request.user).order_by('-created_at')[:10]
+    recent_payments = (
+        Payment.objects.filter(user=request.user)
+        .select_related('invoice')
+        .order_by('-created_at')[:10]
+    )
     return render(request, 'billing/home.html', {
         'tiers': PRICING_TIERS,
         'recent_payments': recent_payments,
         'stripe_enabled': stripe_enabled(),
     })
+
+
+# ── Invoices ─────────────────────────────────────────────────────────────────
+
+@login_required
+def invoice_list(request):
+    invoices = Invoice.objects.filter(user=request.user).select_related('payment').order_by('-created_at')
+    return render(request, 'billing/invoices.html', {'invoices': invoices})
+
+
+@login_required
+def invoice_pdf(request, invoice_number):
+    """
+    Stream the invoice as a PDF. Owners can always download their own invoices;
+    staff can download any (linked from the admin payments page).
+    """
+    qs = Invoice.objects.select_related('user', 'payment')
+    if not getattr(request.user, 'is_staff_member', False):
+        qs = qs.filter(user=request.user)
+    invoice = get_object_or_404(qs, invoice_number=invoice_number)
+
+    pdf = render_invoice_pdf(invoice)
+    disposition = 'inline' if request.GET.get('view') else 'attachment'
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'{disposition}; filename="{invoice.pdf_filename}"'
+    response['Content-Length'] = len(pdf)
+    return response
 
 
 # ── Stripe Checkout ──────────────────────────────────────────────────────────

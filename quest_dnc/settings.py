@@ -219,6 +219,17 @@ APPSUMO_API_KEY       = config('APPSUMO_API_KEY', default='')  # signs webhooks 
 # empty hides the "Card" option in the purchase modal.
 # Webhook endpoint: https://<your-host>/billing/webhook/
 # (event: checkout.session.completed) — its signing secret is STRIPE_WEBHOOK_SECRET.
+# Public base URL of the app; used for absolute links in emails and invoice PDFs.
+SITE_URL = config('SITE_URL', default='https://app.checkdnc.net').rstrip('/')
+
+# Details printed on invoice PDFs.
+INVOICE_COMPANY = {
+    'name': config('INVOICE_COMPANY_NAME', default='CheckDNC'),
+    'address': config('INVOICE_COMPANY_ADDRESS', default=''),   # comma-separated lines
+    'email': config('INVOICE_COMPANY_EMAIL', default='support@checkdnc.net'),
+    'website': config('INVOICE_COMPANY_WEBSITE', default='https://checkdnc.net'),
+}
+
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')

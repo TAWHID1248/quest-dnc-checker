@@ -1,0 +1,29 @@
+{# Floating WhatsApp chat button — bottom-right on every page. Included by base.html and base_auth.html. #}
+<style>
+  .wa-fab {
+    position: fixed; right: 20px; bottom: 20px; z-index: 1040;
+    display: flex; align-items: center; gap: .55rem;
+    height: 56px; padding: 0 18px 0 14px; border-radius: 28px;
+    background: #25d366; color: #0d1117; text-decoration: none;
+    font-weight: 700; font-size: .9rem; line-height: 1;
+    box-shadow: 0 6px 20px rgba(37, 211, 102, .35), 0 2px 6px rgba(0,0,0,.4);
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .wa-fab:hover, .wa-fab:focus-visible {
+    background: #1fb457; color: #0d1117; transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(37, 211, 102, .45), 0 3px 8px rgba(0,0,0,.45);
+    outline: none;
+  }
+  .wa-fab i { font-size: 1.7rem; }
+  .wa-fab .wa-fab-label { white-space: nowrap; }
+  @media (max-width: 575.98px) {
+    .wa-fab { right: 14px; bottom: 14px; width: 56px; padding: 0; justify-content: center; }
+    .wa-fab .wa-fab-label { display: none; }
+  }
+</style>
+<a class="wa-fab" id="wa-fab"
+   href="https://wa.me/13472516953?text={% if user.is_authenticated %}{{ 'Hi! I need help with my CheckDNC account. My account email: '|add:user.email|urlencode }}{% else %}{{ 'Hi! I have a question about CheckDNC.'|urlencode }}{% endif %}"
+   target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp" title="Chat with us on WhatsApp">
+  <i class="bi bi-whatsapp"></i>
+  <span class="wa-fab-label">Chat with us</span>
+</a>

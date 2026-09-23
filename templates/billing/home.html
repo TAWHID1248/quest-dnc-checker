@@ -14,7 +14,8 @@
   .tier-name   { font-size:1rem; font-weight:700; color:#e6edf3; }
   .tier-price  { font-size:2.6rem; font-weight:800; color:#e6edf3; line-height:1; }
   .tier-price sup { font-size:1.2rem; font-weight:600; vertical-align:super; }
-  .tier-credits { font-size:.875rem; color:#6e7681; margin-top:.2rem; }
+  .tier-price-unit { font-size:1rem; font-weight:600; color:#8b949e; }
+  .tier-credits { font-size:1.1rem; font-weight:700; color:#e6edf3; margin-top:.35rem; }
   .tier-per-k   { font-size:.78rem; color:#3fb950; font-weight:600; }
   .tier-features { list-style:none; padding:0; margin:1.5rem 0; }
   .tier-features li { padding:.4rem 0; font-size:.875rem; color:#8b949e; display:flex; align-items:center; gap:.6rem; border-bottom:1px solid #161b22; }
@@ -78,8 +79,8 @@
       {% endif %}
       <div class="mb-3">
         <div class="tier-name mb-1">{{ tier.name }}</div>
-        <div class="tier-price"><sup>$</sup>{{ tier.price }}</div>
-        <div class="tier-credits">{{ tier.credits_display }} credits</div>
+        <div class="tier-price">{{ tier.credits_display }} <span class="tier-price-unit">credits</span></div>
+        <div class="tier-credits">${{ tier.price }}</div>
         <div class="tier-per-k">{{ tier.per_k }} per 1,000 numbers</div>
       </div>
       <ul class="tier-features">

@@ -181,7 +181,7 @@
               <button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('fileInput').click()">
                 <i class="bi bi-folder2-open me-1"></i>Browse Files
               </button>
-              <input type="file" id="fileInput" name="file" accept=".csv,.txt" class="d-none">
+              <input type="file" id="fileInput" name="file" accept=".csv,.txt,.xlsx" class="d-none">
             </div>
             <div class="file-info" id="fileInfo">
               <i class="bi bi-file-earmark-text text-primary fs-5"></i>
@@ -252,7 +252,7 @@
             </h2>
             <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
               <div class="accordion-body" style="font-size:.85rem;color:#8b949e;">
-                We accept <strong style="color:#e6edf3;">.csv</strong> and <strong style="color:#e6edf3;">.txt</strong> files with one phone number per line. Numbers can include dashes, parentheses, or spaces — we normalize them automatically.
+                We accept <strong style="color:#e6edf3;">.csv</strong>, <strong style="color:#e6edf3;">.txt</strong> and <strong style="color:#e6edf3;">.xlsx</strong> files — either one phone number per line or a full contact list with a phone column. Numbers can include dashes, parentheses, or spaces — we normalize them automatically, and your other columns (name, address, e-mail, …) are kept in the Clean and DNC downloads.
               </div>
             </div>
           </div>
@@ -469,6 +469,12 @@ function showFile(file) {
   creditEst.textContent = '—';
 
   const token = ++_countToken;
+  if (/\.xlsx$/i.test(file.name)) {
+    // Excel is a zip container — newline counting is meaningless.
+    lineEst.textContent = 'counted after upload';
+    creditEst.textContent = '1 credit per unique number';
+    return;
+  }
   countLines(file, token).then(lines => {
     if (lines === null || token !== _countToken) return;
     lineEst.textContent = lines.toLocaleString();

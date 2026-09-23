@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT files containing phone numbers; background workers check each number against Federal DNC and State DNC registries and return a clean-number CSV. Access is credit-based; credits are purchased by card via hosted Stripe Checkout (re-added Sep 2026) or via a manual WhatsApp flow (message support, admin grants credits). PayPal was removed in Aug 2026.
+A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT/XLSX files containing phone numbers (optionally with other contact columns); background workers check each number against Federal DNC and State DNC registries and return Clean and DNC result files that keep every original column (CSV in → CSV out, XLSX in → XLSX out). Access is credit-based; credits are purchased by card via hosted Stripe Checkout (re-added Sep 2026) or via a manual WhatsApp flow (message support, admin grants credits). PayPal was removed in Aug 2026.
 
 ---
 
@@ -40,7 +40,7 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 │   └── views.py            ← billing_home, invoice_list/invoice_pdf, create_checkout, checkout_success/cancel, stripe_webhook
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
 │   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
-│   ├── phone.py            ← Phone normalisation + file parsing
+│   ├── phone.py            ← Phone normalisation + CSV/TXT/XLSX parsing (keeps full rows, dedups by number)
 │   ├── tasks.py            ← process_scrub_job Celery task
 │   ├── views.py            ← scrubber_home + job_status (AJAX) + upload handler
 │   └── urls.py             ← /scrubber/ and /scrubber/status/<job_id>/
@@ -111,10 +111,10 @@ historical Payment/CreditTransaction FKs; hosted Checkout does not create new re
 `scrubber/tasks.py → process_scrub_job(job_id)`
 
 1. Mark job PROCESSING
-2. Parse & deduplicate phone numbers from uploaded file
+2. Parse uploaded file (`phone.parse_file`): header + phone-column detection, dedup by number, full row kept per number
 3. Credit pre-flight check (non-atomic fast check)
 4. Atomic credit check + batch processing through `dnc.run_checks()`
-5. Write clean-number result CSV to media storage
+5. Write Clean and DNC result files (all original columns; .xlsx if the upload was .xlsx, else .csv) to media storage
 6. Mark job COMPLETED with final counts
 7. Atomic credit deduction + CreditTransaction record
 8. Send completion email to user

@@ -4,14 +4,15 @@ Celery task: process a ScrubJob end-to-end.
 Pipeline
 --------
 1.  Load ScrubJob → mark PROCESSING
-2.  Open uploaded file (or load remaining numbers from partial file on resume)
+2.  Parse uploaded file (CSV/TXT/XLSX) keeping full rows; on resume also
+    load remaining numbers from the partial file
 3.  Credit pre-flight check
 4.  Start a background monitor thread that polls Redis every 300 ms for
     pause / cancel signals and sets a threading.Event immediately
 5.  Process in chunks of CONTROL_CHECK_SIZE; _check_one skips new calls
     as soon as the stop_event is set, so queued calls halt within one
     API-call latency (~100 ms) of the user clicking pause
-6.  Write clean-numbers and DNC-numbers result CSVs
+6.  Write clean and DNC result files (CSV or XLSX, all original columns kept)
 7.  Persist final counts + COMPLETED
 8.  Deduct credits atomically + create CreditTransaction record
 9.  Send completion email
@@ -24,7 +25,8 @@ Pause / Resume / Cancel
 - BatchResult.unchecked holds numbers not sent to the API yet
 - On pause: partial file = {clean, dnc, remaining} (unchecked + subsequent)
 - On cancel: mark CANCELLED, delete partial file
-- On resume: load remaining from partial file — no need to re-parse upload
+- On resume: load remaining from partial file; the upload is re-parsed only
+  to recover the original row data for the result files
 
 Error handling
 --------------
@@ -38,6 +40,7 @@ import logging
 import threading
 import time
 from contextlib import contextmanager
+from datetime import date, datetime
 
 from celery import shared_task
 from django.conf import settings
@@ -48,7 +51,7 @@ from django.db import transaction
 from billing.models import CreditTransaction
 from .dnc import run_checks
 from .models import ScrubJob
-from .phone import extract_unique_numbers
+from .phone import ParsedFile, cell_text, format_number, is_excel, parse_file
 
 logger = logging.getLogger(__name__)
 
@@ -160,26 +163,66 @@ def _job_error_guard(job: ScrubJob):
         raise
 
 
-def _fmt(num: str) -> str:
-    return f"({num[:3]}) {num[3:6]}-{num[6:]}"
+def _upload_name(job: ScrubJob) -> str:
+    """Name used to pick the parser/output format: prefer whichever carries the extension."""
+    for name in (job.filename, job.file.name if job.file else ''):
+        if name and '.' in name.rsplit('/', 1)[-1]:
+            return name
+    return job.filename or ''
 
 
-def _build_clean_csv(clean_numbers: list) -> bytes:
+def _rows_for(parsed: ParsedFile, numbers: list) -> list:
+    """Full original rows for the given numbers (falls back to the bare number)."""
+    out = []
+    for num in numbers:
+        row = parsed.rows.get(num)
+        out.append(list(row) if row is not None else [format_number(num)])
+    return out
+
+
+def _build_csv(header: list, rows: list) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator='\r\n')
-    writer.writerow(['phone_number'])
-    for num in clean_numbers:
-        writer.writerow([_fmt(num)])
-    return ('﻿' + buf.getvalue()).encode('utf-8')
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow([cell_text(c) for c in row])
+    return ('\ufeff' + buf.getvalue()).encode('utf-8')
 
 
-def _build_dnc_csv(dnc_numbers: list) -> bytes:
-    buf = io.StringIO()
-    writer = csv.writer(buf, lineterminator='\r\n')
-    writer.writerow(['phone_number'])
-    for num in dnc_numbers:
-        writer.writerow([_fmt(num)])
-    return ('﻿' + buf.getvalue()).encode('utf-8')
+def _xlsx_cell(value):
+    """Keep native numbers/dates for Excel output; everything else as text."""
+    if value is None or value == '':
+        return None
+    if isinstance(value, (int, float, datetime, date)) and not isinstance(value, bool):
+        return value
+    return cell_text(value)
+
+
+def _build_xlsx(header: list, rows: list) -> bytes:
+    import openpyxl
+
+    wb = openpyxl.Workbook(write_only=True)
+    ws = wb.create_sheet('Results')
+    ws.append(header)
+    for row in rows:
+        ws.append([_xlsx_cell(c) for c in row])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _build_result_file(parsed: ParsedFile, numbers: list, excel: bool) -> tuple[str, bytes]:
+    """
+    Build a result file containing every original column for each number.
+
+    Returns (extension, bytes). Excel uploads get an .xlsx back, everything
+    else gets a UTF-8 (BOM) CSV.
+    """
+    header = parsed.output_header
+    rows = _rows_for(parsed, numbers)
+    if excel:
+        return '.xlsx', _build_xlsx(header, rows)
+    return '.csv', _build_csv(header, rows)
 
 
 def _send_completion_email(job: ScrubJob) -> None:
@@ -266,6 +309,22 @@ def run_scrub_job(job_id: int) -> dict:
         _set_status(job, ScrubJob.Status.PROCESSING)
 
         # ── 2. Get the list of numbers to process ───────────────────
+        # The upload is always re-parsed (also on resume) so every result row
+        # can carry the user's original columns, not just the phone number.
+        if not job.file:
+            raise FileNotFoundError(f"No file attached to job {job.job_id}")
+        try:
+            job.file.open('rb')
+            parsed = parse_file(job.file, _upload_name(job))
+        finally:
+            job.file.close()
+
+        logger.info(
+            "Job %s: parsed %d rows → %d unique valid numbers, %d invalid, %d duplicates",
+            job.job_id, parsed.total_rows, len(parsed.numbers),
+            parsed.invalid, parsed.duplicates,
+        )
+
         if is_resume and job.partial_data_file:
             all_clean, all_dnc, remaining = _load_partial(job)
             total = job.total  # set during the first run
@@ -274,27 +333,14 @@ def run_scrub_job(job_id: int) -> dict:
                 job.job_id, len(remaining), len(all_clean), len(all_dnc),
             )
         else:
-            if not job.file:
-                raise FileNotFoundError(f"No file attached to job {job.job_id}")
-            try:
-                job.file.open('rb')
-                numbers, total_lines, invalid_count = extract_unique_numbers(job.file)
-            finally:
-                job.file.close()
-
-            logger.info(
-                "Job %s: parsed %d lines → %d unique valid numbers, %d invalid",
-                job.job_id, total_lines, len(numbers), invalid_count,
-            )
-
-            if not numbers:
+            if not parsed.numbers:
                 raise NoValidNumbersError(
-                    f"File contained {total_lines} lines but zero valid US phone numbers."
+                    f"File contained {parsed.total_rows} rows but zero valid US phone numbers."
                 )
 
-            total = len(numbers)
+            total = len(parsed.numbers)
             all_clean, all_dnc = [], []
-            remaining = numbers
+            remaining = parsed.numbers
 
             job.total = total
             job.save(update_fields=['total'])
@@ -374,15 +420,18 @@ def run_scrub_job(job_id: int) -> dict:
             stop_event.set()   # always stop the monitor thread
             monitor.join(timeout=2)
 
-        # ── 6. Write result CSVs ────────────────────────────────────
+        # ── 6. Write result files (same format as the upload) ───────
+        excel_out = is_excel(_upload_name(job))
+        ext, clean_bytes = _build_result_file(parsed, all_clean, excel_out)
         job.result_file.save(
-            f"{job.job_id}_clean.csv",
-            ContentFile(_build_clean_csv(all_clean)),
+            f"{job.job_id}_clean{ext}",
+            ContentFile(clean_bytes),
             save=False,
         )
+        ext, dnc_bytes = _build_result_file(parsed, all_dnc, excel_out)
         job.result_file_dnc.save(
-            f"{job.job_id}_dnc.csv",
-            ContentFile(_build_dnc_csv(all_dnc)),
+            f"{job.job_id}_dnc{ext}",
+            ContentFile(dnc_bytes),
             save=False,
         )
 

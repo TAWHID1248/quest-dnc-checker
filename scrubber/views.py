@@ -18,7 +18,7 @@ from .models import ScrubJob
 logger = logging.getLogger(__name__)
 
 _VALID_SCRUB_TYPES = {'federal_dnc', 'state_dnc'}
-_ALLOWED_EXTENSIONS = {'.csv', '.txt'}
+_ALLOWED_EXTENSIONS = {'.csv', '.txt', '.xlsx'}
 _MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB hard cap
 
 
@@ -54,7 +54,7 @@ def job_status(request, job_id):
 
 @login_required
 def download_result(request, job_id):
-    """Stream the clean-numbers CSV to the browser. Enforces ownership."""
+    """Stream the clean-rows result file (CSV or XLSX) to the browser. Enforces ownership."""
     job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
     if not job.result_file or job.status != ScrubJob.Status.COMPLETED:
         raise Http404
@@ -68,7 +68,7 @@ def download_result(request, job_id):
 
 @login_required
 def download_result_dnc(request, job_id):
-    """Stream the DNC-numbers CSV to the browser. Enforces ownership."""
+    """Stream the DNC-rows result file (CSV or XLSX) to the browser. Enforces ownership."""
     job = get_object_or_404(ScrubJob, job_id=job_id, user=request.user)
     if not job.result_file_dnc or job.status != ScrubJob.Status.COMPLETED:
         raise Http404
@@ -158,7 +158,7 @@ def presign_upload(request):
     safe_name = re.sub(r'[^\w.\-]', '_', raw_name)[:200]
     ext = ('.' + safe_name.rsplit('.', 1)[-1].lower()) if '.' in safe_name else ''
     if ext not in _ALLOWED_EXTENSIONS:
-        return JsonResponse({'ok': False, 'error': 'Only .csv and .txt files are accepted.'}, status=400)
+        return JsonResponse({'ok': False, 'error': 'Only .csv, .txt and .xlsx files are accepted.'}, status=400)
 
     date_path = datetime.now().strftime('%Y/%m')
     key = f"scrub_uploads/{date_path}/{uuid4().hex}_{safe_name}"
@@ -229,7 +229,7 @@ def _handle_upload(request, recent_jobs):
             return _error('Invalid file key.')
         ext = ('.' + file_key.rsplit('.', 1)[-1].lower()) if '.' in file_key else ''
         if ext not in _ALLOWED_EXTENSIONS:
-            return _error('Only .csv and .txt files are accepted.')
+            return _error('Only .csv, .txt and .xlsx files are accepted.')
         if not original_filename:
             original_filename = file_key.rsplit('_', 1)[-1]
 
@@ -259,7 +259,7 @@ def _handle_upload(request, recent_jobs):
 
         ext = '.' + uploaded.name.rsplit('.', 1)[-1].lower() if '.' in uploaded.name else ''
         if ext not in _ALLOWED_EXTENSIONS:
-            return _error('Only .csv and .txt files are accepted.')
+            return _error('Only .csv, .txt and .xlsx files are accepted.')
 
         if uploaded.size > _MAX_FILE_SIZE:
             return _error(f'File too large. Maximum size is {_MAX_FILE_SIZE // 1024 // 1024} MB.')

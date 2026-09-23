@@ -114,7 +114,7 @@ historical Payment/CreditTransaction FKs; hosted Checkout does not create new re
 2. Parse uploaded file (`phone.parse_file`): header + phone-column detection, dedup by number, full row kept per number
 3. Credit pre-flight check (non-atomic fast check)
 4. Atomic credit check + batch processing through `dnc.run_checks()`
-5. Write Clean and DNC result files (all original columns; .xlsx if the upload was .xlsx, else .csv) to media storage
+5. Write Clean and DNC result files (all original columns + `dnc_status` = "Clean" / "Do Not Call"; .xlsx if the upload was .xlsx, else .csv) to media storage
 6. Mark job COMPLETED with final counts
 7. Atomic credit deduction + CreditTransaction record
 8. Send completion email to user

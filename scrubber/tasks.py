@@ -12,7 +12,8 @@ Pipeline
 5.  Process in chunks of CONTROL_CHECK_SIZE; _check_one skips new calls
     as soon as the stop_event is set, so queued calls halt within one
     API-call latency (~100 ms) of the user clicking pause
-6.  Write clean and DNC result files (CSV or XLSX, all original columns kept)
+6.  Write clean and DNC result files (CSV or XLSX, all original columns
+    kept, plus a dnc_status column: 'Clean' / 'Do Not Call')
 7.  Persist final counts + COMPLETED
 8.  Deduct credits atomically + create CreditTransaction record
 9.  Send completion email
@@ -211,15 +212,28 @@ def _build_xlsx(header: list, rows: list) -> bytes:
     return buf.getvalue()
 
 
-def _build_result_file(parsed: ParsedFile, numbers: list, excel: bool) -> tuple[str, bytes]:
+STATUS_COLUMN = 'dnc_status'
+STATUS_CLEAN   = 'Clean'
+STATUS_DNC     = 'Do Not Call'
+
+
+def _build_result_file(
+    parsed: ParsedFile, numbers: list, excel: bool, status: str,
+) -> tuple[str, bytes]:
     """
-    Build a result file containing every original column for each number.
+    Build a result file containing every original column for each number,
+    plus a trailing ``dnc_status`` column ('Clean' or 'Do Not Call').
 
     Returns (extension, bytes). Excel uploads get an .xlsx back, everything
     else gets a UTF-8 (BOM) CSV.
     """
-    header = parsed.output_header
-    rows = _rows_for(parsed, numbers)
+    base_header = parsed.output_header
+    width = len(base_header)
+    header = base_header + [STATUS_COLUMN]
+    rows = []
+    for row in _rows_for(parsed, numbers):
+        row = row[:width] + [''] * (width - len(row))   # align status column
+        rows.append(row + [status])
     if excel:
         return '.xlsx', _build_xlsx(header, rows)
     return '.csv', _build_csv(header, rows)
@@ -422,13 +436,13 @@ def run_scrub_job(job_id: int) -> dict:
 
         # ── 6. Write result files (same format as the upload) ───────
         excel_out = is_excel(_upload_name(job))
-        ext, clean_bytes = _build_result_file(parsed, all_clean, excel_out)
+        ext, clean_bytes = _build_result_file(parsed, all_clean, excel_out, STATUS_CLEAN)
         job.result_file.save(
             f"{job.job_id}_clean{ext}",
             ContentFile(clean_bytes),
             save=False,
         )
-        ext, dnc_bytes = _build_result_file(parsed, all_dnc, excel_out)
+        ext, dnc_bytes = _build_result_file(parsed, all_dnc, excel_out, STATUS_DNC)
         job.result_file_dnc.save(
             f"{job.job_id}_dnc{ext}",
             ContentFile(dnc_bytes),

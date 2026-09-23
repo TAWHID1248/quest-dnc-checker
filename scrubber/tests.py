@@ -59,11 +59,11 @@ class ResultFileTests(TestCase):
 
         clean = list(csv.reader(io.StringIO(job.result_file.read().decode('utf-8-sig'))))
         self.assertEqual(clean, [
-            ['CELLPHONE', 'FIRST', 'LAST', 'CITY'],
-            ['4405829719', 'Frank', 'Toth', 'North Royalton'],
+            ['CELLPHONE', 'FIRST', 'LAST', 'CITY', 'dnc_status'],
+            ['4405829719', 'Frank', 'Toth', 'North Royalton', 'Clean'],
         ])
         dnc = list(csv.reader(io.StringIO(job.result_file_dnc.read().decode('utf-8-sig'))))
-        self.assertEqual(dnc[1], ['9032757138', 'Georgia', 'Kirvy', 'Wills Point'])
+        self.assertEqual(dnc[1], ['9032757138', 'Georgia', 'Kirvy', 'Wills Point', 'Do Not Call'])
         self.user.refresh_from_db()
         self.assertEqual(self.user.credits, 998)
 
@@ -86,17 +86,17 @@ class ResultFileTests(TestCase):
 
         out = openpyxl.load_workbook(io.BytesIO(job.result_file.read())).active
         rows = [list(r) for r in out.iter_rows(values_only=True)]
-        self.assertEqual(rows, [['Name', 'Phone', 'Zip'], ['Bob', 4405829719, 44133]])
+        self.assertEqual(rows, [['Name', 'Phone', 'Zip', 'dnc_status'], ['Bob', 4405829719, 44133, 'Clean']])
         out = openpyxl.load_workbook(io.BytesIO(job.result_file_dnc.read())).active
         rows = [list(r) for r in out.iter_rows(values_only=True)]
-        self.assertEqual(rows, [['Name', 'Phone', 'Zip'], ['Ann', 9032757138, 75169]])
+        self.assertEqual(rows, [['Name', 'Phone', 'Zip', 'dnc_status'], ['Ann', 9032757138, 75169, 'Do Not Call']])
 
     def test_plain_number_list_still_works(self, _rc):
         job = self._job('numbers.txt', b'(903) 275-7138\n440-582-9719\n')
         run_scrub_job(job.pk)
         job.refresh_from_db()
         clean = job.result_file.read().decode('utf-8-sig').splitlines()
-        self.assertEqual(clean, ['phone_number', '440-582-9719'])
+        self.assertEqual(clean, ['phone_number,dnc_status', '440-582-9719,Clean'])
 
     def test_resume_after_pause_keeps_columns(self, _rc):
         payload = b'phone,name\n9032757138,A\n4405829719,B\n'
@@ -113,9 +113,9 @@ class ResultFileTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, ScrubJob.Status.COMPLETED)
         clean = list(csv.reader(io.StringIO(job.result_file.read().decode('utf-8-sig'))))
-        self.assertEqual(clean, [['phone', 'name'], ['4405829719', 'B']])
+        self.assertEqual(clean, [['phone', 'name', 'dnc_status'], ['4405829719', 'B', 'Clean']])
         dnc = list(csv.reader(io.StringIO(job.result_file_dnc.read().decode('utf-8-sig'))))
-        self.assertEqual(dnc, [['phone', 'name'], ['9032757138', 'A']])
+        self.assertEqual(dnc, [['phone', 'name', 'dnc_status'], ['9032757138', 'A', 'Do Not Call']])
 
 
 @override_settings(

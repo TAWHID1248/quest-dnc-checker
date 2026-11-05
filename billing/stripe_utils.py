@@ -80,6 +80,9 @@ def create_checkout_session(user, tier: dict, success_url: str, cancel_url: str)
                 'product_data': {
                     'name': f"CheckDNC {tier['name']} plan",
                     'description': f"{tier['credits_display']} DNC scrubbing credits",
+                    # SaaS - business use. Required by Managed Payments and
+                    # used by Stripe Tax; harmless on accounts without either.
+                    'tax_code': 'txcd_10103001',
                 },
             },
         }],

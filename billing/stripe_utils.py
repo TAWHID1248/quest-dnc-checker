@@ -70,7 +70,8 @@ def create_checkout_session(user, tier: dict, success_url: str, cancel_url: str)
     return stripe.checkout.Session.create(
         mode='payment',
         customer=customer_id,
-        payment_method_types=['card'],
+        # No payment_method_types: Stripe picks the methods enabled in the
+        # Dashboard. Passing it is rejected on accounts with Managed Payments.
         line_items=[{
             'quantity': 1,
             'price_data': {

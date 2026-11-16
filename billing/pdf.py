@@ -58,8 +58,8 @@ def _payment_reference(invoice):
     if payment is None:
         return 'Credits granted by CheckDNC support'
     parts = [f"Payment {payment.payment_id}", payment.get_provider_display()]
-    if payment.stripe_pi_id:
-        parts.append(payment.stripe_pi_id)
+    if payment.provider_ref:
+        parts.append(payment.provider_ref)
     return ' · '.join(parts)
 
 

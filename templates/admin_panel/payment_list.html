@@ -147,7 +147,7 @@
             {% endif %}
           </td>
           <td style="font-family:monospace;font-size:.72rem;color:#6e7681;">
-            {{ p.paypal_order_id|default:p.stripe_pi_id|default:"—"|truncatechars:28 }}
+            {{ p.provider_ref|default:"—"|truncatechars:28 }}
           </td>
           <td class="text-end" style="color:#6e7681;white-space:nowrap;">{{ p.created_at|date:"M d, Y" }}</td>
           <td class="text-end">

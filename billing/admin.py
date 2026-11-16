@@ -32,6 +32,6 @@ class InvoiceAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ('payment_id', 'user', 'amount', 'credits', 'status', 'provider', 'paypal_order_id', 'created_at')
     list_filter = ('status', 'provider', 'created_at')
-    search_fields = ('payment_id', 'user__email', 'stripe_pi_id', 'paypal_order_id')
+    search_fields = ('payment_id', 'user__email', 'stripe_pi_id', 'paypal_order_id', 'checkoutpage_payment_id')
     readonly_fields = ('payment_id', 'created_at')
     ordering = ('-created_at',)

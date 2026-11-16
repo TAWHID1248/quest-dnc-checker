@@ -28,7 +28,7 @@
   }
   .btn-whatsapp:hover { background:#1fb457; color:#0d1117; }
 
-  /* Card checkout (Stripe) */
+  /* Card checkout */
   .btn-card-pay {
     display:flex; align-items:center; justify-content:center; gap:.6rem;
     width:100%; padding:.65rem 1rem; margin-bottom:.75rem;
@@ -183,8 +183,8 @@
           <div id="modal-price"     style="font-size:1.2rem;font-weight:700;color:#3fb950;margin-top:.25rem;"></div>
         </div>
 
-        <!-- ── Card (Stripe hosted Checkout) ────── -->
-        {% if stripe_enabled %}
+        <!-- ── Card (hosted checkout) ────── -->
+        {% if card_enabled %}
         <form method="post" action="{% url 'billing:create_checkout' %}" id="card-checkout-form">
           {% csrf_token %}
           <input type="hidden" name="tier" id="checkout-tier" value="">
@@ -206,7 +206,7 @@
           <span class="soon-badge">Coming soon</span>
         </div>
 
-        {% if stripe_enabled %}<div class="pay-divider">or pay manually</div>{% endif %}
+        {% if card_enabled %}<div class="pay-divider">or pay manually</div>{% endif %}
 
         <!-- ── Contact us (WhatsApp) ─────────────── -->
         <a id="wa-chat-btn" class="btn btn-whatsapp w-100 fw-semibold py-2" href="#" target="_blank" rel="noopener">

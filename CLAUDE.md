@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT/XLSX files containing phone numbers (optionally with other contact columns); background workers check each number against Federal DNC and State DNC registries and return Clean and DNC result files that keep every original column (CSV in → CSV out, XLSX in → XLSX out). Access is credit-based; credits are purchased by card via hosted Stripe Checkout (re-added Sep 2026) or via a manual WhatsApp flow (message support, admin grants credits). PayPal was removed in Aug 2026.
+A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. Users upload CSV/TXT/XLSX files containing phone numbers (optionally with other contact columns); background workers check each number against Federal DNC and State DNC registries and return Clean and DNC result files that keep every original column (CSV in → CSV out, XLSX in → XLSX out). Access is credit-based; credits are purchased by card via hosted Checkout Page pages (checkoutpage.com, added Nov 2026; Stripe hosted Checkout remains as the fallback) or via a manual WhatsApp flow (message support, admin grants credits). PayPal was removed in Aug 2026.
 
 ---
 
@@ -16,7 +16,7 @@ A SaaS web application for phone-number DNC (Do Not Call) compliance scrubbing. 
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
 | Static files | WhiteNoise (dev/Railway) / Nginx (Docker) |
-| Payments | Stripe hosted Checkout (card) + manual WhatsApp flow / admin credit grants (PayPal removed Aug 2026) |
+| Payments | Checkout Page hosted pages (card; Stripe hosted Checkout as fallback) + manual WhatsApp flow / admin credit grants (PayPal removed Aug 2026) |
 | Auth | Django sessions, custom `accounts.CustomUser` (email-based); optional Google OAuth 2.0 sign-in/sign-up (`accounts/views.py` `google_login`/`google_callback`, hand-rolled with `requests`) |
 | Deployment | Railway (primary), Docker + Nginx (self-hosted) |
 
@@ -34,10 +34,11 @@ quest-dnc-checker/          ← Django project root (manage.py lives here)
 ├── admin_panel/            ← Internal admin dashboard (client/ticket/payment mgmt)
 ├── api/                    ← Vercel WSGI wrapper (api/index.py)
 ├── billing/                ← Credits: pricing tiers, payment/credit-ledger models, billing page
+│   ├── checkoutpage_utils.py ← Checkout Page: signed checkout URL, webhook signature, payments API
 │   ├── stripe_utils.py     ← All Stripe SDK calls (customer, Checkout Session, webhook verify)
-│   ├── services.py         ← fulfil_checkout_session(): idempotent credit grant + Invoice email
+│   ├── services.py         ← fulfil_checkoutpage_payment() / fulfil_checkout_session(): idempotent credit grant + Invoice email
 │   ├── pdf.py              ← render_invoice_pdf(): reportlab invoice PDF (rendered on demand, not stored)
-│   └── views.py            ← billing_home, invoice_list/invoice_pdf, create_checkout, checkout_success/cancel, stripe_webhook
+│   └── views.py            ← billing_home, invoice_list/invoice_pdf, create_checkout, checkout_success/cancel, checkoutpage_webhook, stripe_webhook
 ├── scrubber/               ← Core feature: file upload, DNC engine, Celery task
 │   ├── dnc.py              ← DNC check logic; Redis result cache (bulk MGET/MSET, 7-day TTL)
 │   ├── phone.py            ← Phone normalisation + CSV/TXT/XLSX parsing (keeps full rows, dedups by number)
@@ -97,8 +98,10 @@ Immutable credit ledger. Type: PURCHASE | USAGE | REFUND | ADJUSTMENT. `amount` 
 negative for USAGE (consumed credits).
 
 ### `billing.Payment`
-One purchase. `provider` STRIPE | PAYPAL (legacy) | MANUAL. `stripe_session_id` (unique) is the
-idempotency key for Checkout fulfilment; `stripe_pi_id` is the PaymentIntent.
+One purchase. `provider` CHECKOUT_PAGE | STRIPE | PAYPAL (legacy) | MANUAL. Idempotency keys for
+fulfilment (both unique): `checkoutpage_payment_id` and `stripe_session_id`. `stripe_pi_id` is the
+PaymentIntent (Checkout Page charges through Stripe, so it is filled for both). `provider_ref`
+returns whichever provider reference the row has.
 
 ### `billing.PaymentMethod`
 Legacy stored cards from the original (Elements-based) Stripe integration. Model kept for
@@ -226,7 +229,23 @@ celery -A quest_dnc beat --loglevel=info \
 
 - Credit tiers: Starter $10→100K, Professional $20→250K, Enterprise $50→1M
   (defined in `PRICING_TIERS`, `billing/views.py`)
-- **Card (Stripe hosted Checkout):** the modal's "Pay with Card" button POSTs the tier name to
+- **Card (Checkout Page — primary):** used whenever `CHECKOUTPAGE_API_KEY`,
+  `CHECKOUTPAGE_WEBHOOK_SECRET` and at least one `CHECKOUTPAGE_URL_<TIER>` are set; it then takes
+  over the "Pay with Card" button from Stripe. One hosted page per tier.
+  - `create_checkout` redirects to the tier's page with `?ref=<signed user id>&customer_email=`
+    (`checkoutpage_utils.build_checkout_url`). Checkout Page stores query parameters on the payment.
+  - Webhook `POST /billing/webhook/checkoutpage/` (event `payment.paid`, HMAC-SHA256 of the raw
+    body in `x-webhook-signature`). The body is only used for the payment id; the payment is
+    re-fetched from `GET api.checkoutpage.com/v1/payments/<id>` and passed to
+    `services.fulfil_checkoutpage_payment` (idempotent on `Payment.checkoutpage_payment_id`).
+  - Buyer = signed `ref`, else the checkout email. Credits = the tier whose page URL slug matches
+    the payment's `pageSlug` (never the amount or anything browser-editable). Amounts are cents.
+  - Test-mode payments (`livemode: false`) are free on Checkout Page, so they are ignored unless
+    `CHECKOUTPAGE_ALLOW_TEST_PAYMENTS=True`. Keep it False in production.
+  - Each page must redirect after payment to `/billing/checkout/success/` (set in the Checkout
+    Page dashboard); that view only reports whether the webhook has landed.
+  - Tests: `billing/tests_checkoutpage.py` (API mocked).
+- **Card (Stripe hosted Checkout — fallback when Checkout Page is not configured):** the modal's "Pay with Card" button POSTs the tier name to
   `/billing/checkout/`; `create_checkout_session` builds a one-off `mode=payment` session with
   `price_data` from `PRICING_TIERS` (prices are never trusted from the browser) and redirects to
   Stripe. Metadata carries `user_id`, `tier_name`, `credits`.

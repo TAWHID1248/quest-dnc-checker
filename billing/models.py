@@ -169,6 +169,7 @@ class Payment(models.Model):
 
     class Provider(models.TextChoices):
         STRIPE = 'stripe', 'Stripe'
+        CHECKOUT_PAGE = 'checkoutpage', 'Checkout Page'
         PAYPAL = 'paypal', 'PayPal'
         MANUAL = 'manual', 'Manual'
 
@@ -194,6 +195,10 @@ class Payment(models.Model):
         max_length=255, unique=True, null=True, blank=True,
         help_text='Stripe Checkout Session ID (idempotency key for credit grants)',
     )
+    checkoutpage_payment_id = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text='Checkout Page payment ID (idempotency key for credit grants)',
+    )
     paypal_order_id = models.CharField(
         max_length=255, unique=True, null=True, blank=True,
         help_text='Legacy PayPal Order ID (PayPal removed Aug 2026)',
@@ -212,6 +217,11 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.payment_id} — ${self.amount} / {self.credits} credits ({self.get_status_display()})"
+
+    @property
+    def provider_ref(self):
+        """The provider-side reference to show staff (whichever one this payment has)."""
+        return self.checkoutpage_payment_id or self.paypal_order_id or self.stripe_pi_id or ''
 
     def save(self, *args, **kwargs):
         if not self.payment_id:

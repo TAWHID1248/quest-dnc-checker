@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import timedelta
 
 import stripe
 from django.conf import settings
@@ -8,12 +9,20 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from .checkoutpage_utils import (
+    CheckoutPageError,
+    build_checkout_url,
+    checkoutpage_enabled,
+    retrieve_payment,
+    verify_webhook_signature,
+)
 from .models import Invoice, Payment
 from .pdf import render_invoice_pdf
-from .services import fulfil_checkout_session
+from .services import fulfil_checkout_session, fulfil_checkoutpage_payment
 from .stripe_utils import (
     construct_webhook_event,
     create_checkout_session,
@@ -92,7 +101,7 @@ def billing_home(request):
     return render(request, 'billing/home.html', {
         'tiers': PRICING_TIERS,
         'recent_payments': recent_payments,
-        'stripe_enabled': stripe_enabled(),
+        'card_enabled': checkoutpage_enabled() or stripe_enabled(),
     })
 
 
@@ -123,19 +132,33 @@ def invoice_pdf(request, invoice_number):
     return response
 
 
-# ── Stripe Checkout ──────────────────────────────────────────────────────────
+# ── Card checkout (Checkout Page, or Stripe when Checkout Page is not set up) ─
 
 @login_required
 @require_POST
 def create_checkout(request):
-    """Create a hosted Checkout Session for the chosen tier and redirect to it."""
-    if not stripe_enabled():
-        messages.error(request, 'Card payments are not available right now. Please contact us on WhatsApp.')
-        return redirect('billing:home')
+    """
+    Send the buyer to the hosted checkout for the chosen tier.
 
+    Checkout Page is used when it is configured; otherwise this falls back to
+    a Stripe hosted Checkout Session.
+    """
     tier = _get_tier(request.POST.get('tier', ''))
     if tier is None:
         return HttpResponseBadRequest('Unknown pricing tier')
+
+    if checkoutpage_enabled():
+        url = build_checkout_url(request.user, tier)
+        if url is None:
+            logger.error("No Checkout Page URL configured for tier %s", tier['name'])
+            messages.error(request, f"Card payment for the {tier['name']} plan is not available right now. "
+                                    'Please contact us on WhatsApp.')
+            return redirect('billing:home')
+        return redirect(url, permanent=False)
+
+    if not stripe_enabled():
+        messages.error(request, 'Card payments are not available right now. Please contact us on WhatsApp.')
+        return redirect('billing:home')
 
     success_url = request.build_absolute_uri(reverse('billing:checkout_success')) + '?session_id={CHECKOUT_SESSION_ID}'
     cancel_url = request.build_absolute_uri(reverse('billing:checkout_cancel'))
@@ -152,11 +175,31 @@ def create_checkout(request):
 @login_required
 def checkout_success(request):
     """
-    Landing page after Stripe Checkout. The webhook normally grants credits
-    first; this view re-checks the session so the user sees their balance
-    immediately even if the webhook is delayed (fulfilment is idempotent).
+    Landing page after a card payment.
+
+    Checkout Page redirects here once the buyer has paid; credits are granted
+    by its webhook, so this only reports whether that has landed yet.
+
+    Stripe sends `?session_id=`; the webhook normally grants credits first and
+    this view re-checks the session so the user sees their balance immediately
+    even if the webhook is delayed (fulfilment is idempotent).
     """
     session_id = request.GET.get('session_id', '')
+    if not session_id:
+        recent = Payment.objects.filter(
+            user=request.user,
+            provider=Payment.Provider.CHECKOUT_PAGE,
+            status=Payment.Status.COMPLETED,
+            created_at__gte=timezone.now() - timedelta(minutes=15),
+        ).first()
+        if recent:
+            request.user.refresh_from_db(fields=['credits'])
+            messages.success(
+                request,
+                f'Payment received — {recent.credits:,.0f} credits added. '
+                f'Your balance is now {request.user.credits:,.0f} credits.',
+            )
+            return redirect('billing:home')
     if session_id and stripe_enabled():
         try:
             session = retrieve_checkout_session(session_id)
@@ -227,5 +270,66 @@ def stripe_webhook(request):
             logger.debug("Unhandled Stripe event: %s", event_type)
     except Exception:
         logger.exception("Error handling Stripe event %s", event_type)
+
+    return JsonResponse({'received': True})
+
+
+# ── Checkout Page webhook ────────────────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def checkoutpage_webhook(request):
+    """
+    Checkout Page → app (event: payment.paid). Signature-verified with
+    CHECKOUTPAGE_WEBHOOK_SECRET against the raw body.
+
+    The webhook body is only used to learn the payment id; the payment itself
+    is re-fetched from the Checkout Page API before any credits are granted.
+    Answers 200 for handled/ignored events, 401 for a bad signature, and 503
+    when the API cannot be reached so Checkout Page retries the delivery.
+    """
+    payload = request.body
+    if not settings.CHECKOUTPAGE_WEBHOOK_SECRET:
+        logger.error("CHECKOUTPAGE_WEBHOOK_SECRET not set; rejecting webhook")
+        return HttpResponse(status=400)
+
+    if not verify_webhook_signature(payload, request.META.get('HTTP_X_WEBHOOK_SIGNATURE', '')):
+        logger.warning("Checkout Page webhook signature verification failed")
+        return HttpResponse(status=401)
+
+    try:
+        event = json.loads(payload)
+    except ValueError:
+        return HttpResponse(status=400)
+    if not isinstance(event, dict):
+        return HttpResponse(status=400)
+
+    event_type = event.get('event', '')
+    logger.info("Checkout Page webhook received: %s (%s)", event_type, event.get('eventId'))
+
+    if event_type != 'payment.paid':
+        return JsonResponse({'received': True})
+
+    data = event.get('data') or {}
+    payment_id = ((data.get('payment') or {}).get('id') or data.get('id') or '')
+    if not payment_id:
+        logger.error("Checkout Page payment.paid event without a payment id")
+        return JsonResponse({'received': True})
+
+    try:
+        payment = retrieve_payment(payment_id)
+    except CheckoutPageError:
+        logger.exception("Could not fetch Checkout Page payment %s", payment_id)
+        return HttpResponse(status=503)
+
+    if payment is None:
+        logger.error("Checkout Page payment %s not found via the API", payment_id)
+        return JsonResponse({'received': True})
+
+    try:
+        fulfil_checkoutpage_payment(payment)
+    except Exception:
+        logger.exception("Error fulfilling Checkout Page payment %s", payment_id)
+        return HttpResponse(status=500)
 
     return JsonResponse({'received': True})

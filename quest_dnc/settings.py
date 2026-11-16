@@ -234,6 +234,25 @@ STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
 STRIPE_SECRET_KEY      = config('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET  = config('STRIPE_WEBHOOK_SECRET', default='')
 
+# Checkout Page (checkoutpage.com) — hosted checkout for credit purchases.
+# When configured it takes over the "Pay with Card" button from Stripe.
+#   * One hosted page per pricing tier (URLs below); a tier without a URL
+#     cannot be bought by card.
+#   * Webhook endpoint: https://<your-host>/billing/webhook/checkoutpage/
+#     (event: payment.paid) — its signing secret is CHECKOUTPAGE_WEBHOOK_SECRET.
+#   * On each page set After payment → Redirect to URL:
+#     https://<your-host>/billing/checkout/success/
+CHECKOUTPAGE_API_KEY        = config('CHECKOUTPAGE_API_KEY', default='')
+CHECKOUTPAGE_WEBHOOK_SECRET = config('CHECKOUTPAGE_WEBHOOK_SECRET', default='')
+CHECKOUTPAGE_PAGE_URLS = {
+    'Starter':      config('CHECKOUTPAGE_URL_STARTER', default=''),
+    'Professional': config('CHECKOUTPAGE_URL_PROFESSIONAL', default=''),
+    'Enterprise':   config('CHECKOUTPAGE_URL_ENTERPRISE', default=''),
+}
+# Test-mode payments on Checkout Page are free. Keep this False in production
+# or anyone could get credits from a page left in test mode.
+CHECKOUTPAGE_ALLOW_TEST_PAYMENTS = config('CHECKOUTPAGE_ALLOW_TEST_PAYMENTS', default=False, cast=bool)
+
 # Google OAuth 2.0 ("Sign in with Google"). Create a Web application client at
 # https://console.cloud.google.com/apis/credentials and add
 # https://<your-host>/accounts/google/callback/ as an authorised redirect URI.
